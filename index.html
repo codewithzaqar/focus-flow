@@ -9,7 +9,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M13 2L3 14h9l-1 8 10-12h-9l1-8z'/></svg>">
     <style>
         /* ============================================
-           CSS STYLES - FocusFlow v0.0.2
+           CSS STYLES - FocusFlow v0.0.3.dev0
            Mobile-First Glassmorphism Design
            ============================================ */
         
@@ -1092,6 +1092,86 @@
         }
 
         /* ========================================
+           Clickable Timer Display
+           ======================================== */
+        .timer-display {
+            cursor: pointer;
+            transition: color var(--transition-fast), transform var(--transition-fast);
+        }
+
+        .timer-display:hover {
+            color: var(--accent);
+            transform: scale(1.02);
+        }
+
+        .timer-display:active {
+            transform: scale(0.98);
+        }
+
+        .timer-hint {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 0.25rem;
+            opacity: 0.7;
+        }
+
+        /* ========================================
+           Data Backup Buttons
+           ======================================== */
+        .data-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .data-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-base);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .data-btn:hover {
+            background: var(--bg-glass-hover);
+            border-color: var(--border-glass-light);
+            color: var(--text-primary);
+        }
+
+        .data-btn svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .data-btn.primary-action {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.3);
+            color: var(--accent-focus);
+        }
+
+        .data-btn.primary-action:hover {
+            background: rgba(99, 102, 241, 0.25);
+            border-color: rgba(99, 102, 241, 0.5);
+        }
+
+        .file-input-hidden {
+            display: none;
+        }
+
+        /* ========================================
            Accessibility
            ======================================== */
         @media (prefers-reduced-motion: reduce) {
@@ -1142,10 +1222,11 @@
                                 stroke-dasharray="678.584" stroke-dashoffset="0"/>
                     </svg>
                     <div class="timer-content">
-                        <div class="timer-display" id="timerDisplay">25:00</div>
+                        <div class="timer-display" id="timerDisplay" title="Click to switch mode" tabindex="0" role="button">25:00</div>
                         <div class="timer-label" id="timerLabel">Focus</div>
                     </div>
                 </div>
+                <div class="timer-hint">Click time to switch mode</div>
             </div>
 
             <!-- Controls -->
@@ -1228,13 +1309,24 @@
 
             <div class="settings-section">
                 <div class="settings-label">Data</div>
+                <div class="data-row">
+                    <button class="data-btn primary-action" id="exportDataBtn">
+                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download Backup
+                    </button>
+                    <button class="data-btn" id="importDataBtn">
+                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Restore Backup
+                    </button>
+                    <input type="file" id="importFileInput" class="file-input-hidden" accept=".json,application/json">
+                </div>
                 <button class="danger-btn" id="clearHistoryBtn">Clear All History</button>
             </div>
 
             <div class="settings-section">
                 <div class="settings-label">About</div>
                 <div class="version-info">
-                    <strong>FocusFlow</strong> v0.0.2
+                    <strong>FocusFlow</strong> v0.0.3.dev0
                 </div>
             </div>
         </div>
@@ -1283,7 +1375,7 @@
 
     <script>
         /* ============================================
-           FOCUSFLOW v0.0.2 - JavaScript
+           FOCUSFLOW v0.0.3.dev0 - JavaScript
            ============================================
            
            Modular Architecture:
@@ -1296,7 +1388,9 @@
            7. ConfettiModule - Celebration effect
            8. SettingsModule - User preferences
            9. UIModule - DOM interactions
-           10. App - Main initialization
+           10. App.Data - Data backup/restore (JSON Export/Import)
+           11. App.Input - Keyboard shortcut handler
+           12. App - Main initialization
            
            ============================================ */
 
@@ -2043,6 +2137,222 @@
 
 
         /* ============================================
+           MODULE 10: App.Data
+           Data Backup System (JSON Export/Import)
+           Handles file I/O for localStorage backup/restore
+           ============================================ */
+        const AppData = (() => {
+            // Keys that should be included in backup
+            const BACKUP_KEYS = {
+                tasks: 'focusflow_tasks_v2',
+                history: 'ff_history',
+                settings: 'focusflow_settings_v2'
+            };
+
+            // Required keys for valid backup validation
+            const REQUIRED_KEYS = ['ff_tasks', 'ff_history'];
+
+            // Export all data to JSON
+            const exportData = () => {
+                try {
+                    const backup = {
+                        version: 'v0.0.3.dev0',
+                        exportedAt: new Date().toISOString(),
+                        ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
+                        ff_history: StorageModule.get(BACKUP_KEYS.history, []),
+                        ff_settings: StorageModule.get(BACKUP_KEYS.settings, SettingsModule.DEFAULT_SETTINGS)
+                    };
+
+                    const jsonString = JSON.stringify(backup, null, 2);
+                    const blob = new Blob([jsonString], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+
+                    // Create download link and trigger click
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'focusflow_backup.json';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Clean up blob URL
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+
+                    return { success: true };
+                } catch (error) {
+                    console.error('AppData.exportData error:', error);
+                    return { success: false, error: error.message };
+                }
+            };
+
+            // Validate backup data structure
+            const validateBackup = (data) => {
+                if (!data || typeof data !== 'object') {
+                    return { valid: false, error: 'Invalid file format: Not a valid JSON object' };
+                }
+
+                // Check for required keys (ff_tasks and ff_history)
+                const hasTasksKey = 'ff_tasks' in data;
+                const hasHistoryKey = 'ff_history' in data;
+
+                if (!hasTasksKey && !hasHistoryKey) {
+                    return { 
+                        valid: false, 
+                        error: 'Invalid backup file: Missing required keys (ff_tasks, ff_history)' 
+                    };
+                }
+
+                // Validate ff_tasks structure if present
+                if (hasTasksKey) {
+                    const tasks = data.ff_tasks;
+                    if (typeof tasks !== 'object' || tasks === null) {
+                        return { valid: false, error: 'Invalid ff_tasks format' };
+                    }
+                    if (!Array.isArray(tasks.tasks)) {
+                        return { valid: false, error: 'Invalid ff_tasks.tasks: Must be an array' };
+                    }
+                }
+
+                // Validate ff_history structure if present
+                if (hasHistoryKey) {
+                    if (!Array.isArray(data.ff_history)) {
+                        return { valid: false, error: 'Invalid ff_history: Must be an array' };
+                    }
+                }
+
+                return { valid: true };
+            };
+
+            // Import data from JSON file
+            const importData = (file) => {
+                return new Promise((resolve) => {
+                    if (!file) {
+                        resolve({ success: false, error: 'No file selected' });
+                        return;
+                    }
+
+                    if (!file.type.includes('json') && !file.name.endsWith('.json')) {
+                        resolve({ success: false, error: 'Invalid file type: Please select a JSON file' });
+                        return;
+                    }
+
+                    const reader = new FileReader();
+
+                    reader.onload = (event) => {
+                        try {
+                            const data = JSON.parse(event.target.result);
+
+                            // Validate the backup structure
+                            const validation = validateBackup(data);
+                            if (!validation.valid) {
+                                resolve({ success: false, error: validation.error });
+                                return;
+                            }
+
+                            // Overwrite localStorage with backup data
+                            if (data.ff_tasks) {
+                                StorageModule.set(BACKUP_KEYS.tasks, data.ff_tasks);
+                            }
+                            if (data.ff_history) {
+                                StorageModule.set(BACKUP_KEYS.history, data.ff_history);
+                            }
+                            if (data.ff_settings) {
+                                StorageModule.set(BACKUP_KEYS.settings, data.ff_settings);
+                            }
+
+                            resolve({ success: true, reloadRequired: true });
+                        } catch (parseError) {
+                            console.error('AppData.importData parse error:', parseError);
+                            resolve({ 
+                                success: false, 
+                                error: 'Failed to parse JSON file: ' + parseError.message 
+                            });
+                        }
+                    };
+
+                    reader.onerror = () => {
+                        resolve({ success: false, error: 'Failed to read file' });
+                    };
+
+                    reader.readAsText(file);
+                });
+            };
+
+            return { exportData, importData, validateBackup };
+        })();
+
+
+        /* ============================================
+           MODULE 11: App.Input
+           Keyboard Shortcuts Handler
+           ============================================ */
+        const AppInput = (() => {
+            let isInitialized = false;
+            let callbacks = {};
+
+            const SHORTCUTS = {
+                TOGGLE_TIMER: ' ',       // Spacebar
+                CLOSE_MODAL: 'Escape',   // Esc
+                NEW_TASK: 'n'            // N key
+            };
+
+            const init = (handlers) => {
+                if (isInitialized) return;
+                
+                callbacks = handlers || {};
+                
+                document.addEventListener('keydown', handleKeyDown);
+                isInitialized = true;
+            };
+
+            const handleKeyDown = (event) => {
+                const target = event.target;
+                const tagName = target.tagName.toLowerCase();
+                const isEditable = tagName === 'input' || tagName === 'textarea' || target.isContentEditable;
+
+                // Always handle Escape (close modals)
+                if (event.key === 'Escape') {
+                    if (callbacks.onEscape) {
+                        callbacks.onEscape();
+                    }
+                    return;
+                }
+
+                // Don't handle other shortcuts when typing in inputs
+                if (isEditable) {
+                    return;
+                }
+
+                // Spacebar - Toggle Timer
+                if (event.code === 'Space' || event.key === ' ') {
+                    event.preventDefault();
+                    if (callbacks.onToggleTimer) {
+                        callbacks.onToggleTimer();
+                    }
+                    return;
+                }
+
+                // N key - Focus new task input
+                if (event.key.toLowerCase() === 'n') {
+                    event.preventDefault();
+                    if (callbacks.onNewTask) {
+                        callbacks.onNewTask();
+                    }
+                    return;
+                }
+            };
+
+            const destroy = () => {
+                document.removeEventListener('keydown', handleKeyDown);
+                isInitialized = false;
+                callbacks = {};
+            };
+
+            return { init, destroy, SHORTCUTS };
+        })();
+
+
+        /* ============================================
            MODULE 9: UIModule
            DOM manipulation and event handling
            ============================================ */
@@ -2076,6 +2386,9 @@
                 elements.volumeSlider = $('#volumeSlider');
                 elements.volumeValue = $('#volumeValue');
                 elements.clearHistoryBtn = $('#clearHistoryBtn');
+                elements.exportDataBtn = $('#exportDataBtn');
+                elements.importDataBtn = $('#importDataBtn');
+                elements.importFileInput = $('#importFileInput');
                 elements.statsBtn = $('#statsBtn');
                 elements.statsOverlay = $('#statsOverlay');
                 elements.statsClose = $('#statsClose');
@@ -2256,11 +2569,12 @@
 
 
         /* ============================================
-           MODULE 10: App
+           MODULE 12: App
            Main application initialization & events
            ============================================ */
         const App = (() => {
             let currentMode = 'focus';
+            const MODES = ['focus', 'short', 'long'];
 
             const init = () => {
                 UIModule.cache();
@@ -2280,9 +2594,17 @@
                 UIModule.updateVolumeDisplay(initialVolume);
 
                 bindEvents();
+                initKeyboardShortcuts();
                 UIModule.requestNotificationPermission();
 
-                console.log('FocusFlow v0.0.2 initialized');
+                console.log('FocusFlow v0.0.3.dev0 initialized');
+            };
+
+            // Cycle to next mode: focus -> short -> long -> focus
+            const cycleMode = () => {
+                const currentIndex = MODES.indexOf(currentMode);
+                const nextIndex = (currentIndex + 1) % MODES.length;
+                setMode(MODES[nextIndex]);
             };
 
             const setMode = (mode) => {
@@ -2468,6 +2790,50 @@
                     }
                 });
 
+                // Data Export
+                elements.exportDataBtn?.addEventListener('click', () => {
+                    const result = AppData.exportData();
+                    if (!result.success) {
+                        alert('Export failed: ' + result.error);
+                    }
+                });
+
+                // Data Import
+                elements.importDataBtn?.addEventListener('click', () => {
+                    elements.importFileInput?.click();
+                });
+
+                elements.importFileInput?.addEventListener('change', async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const result = await AppData.importData(file);
+                    
+                    // Reset file input for future imports
+                    e.target.value = '';
+
+                    if (result.success) {
+                        if (result.reloadRequired) {
+                            alert('Backup restored successfully! The page will now reload.');
+                            window.location.reload();
+                        }
+                    } else {
+                        alert('Import failed: ' + result.error);
+                    }
+                });
+
+                // Timer display click - cycle mode
+                elements.timerDisplay?.addEventListener('click', () => {
+                    cycleMode();
+                });
+
+                elements.timerDisplay?.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        cycleMode();
+                    }
+                });
+
                 // Stats panel
                 elements.statsBtn?.addEventListener('click', () => {
                     UIModule.toggleStats(true);
@@ -2493,19 +2859,12 @@
                         }
                     }, 150);
                 });
+            };
 
-                // Keyboard shortcuts
-                document.addEventListener('keydown', (e) => {
-                    if (e.target.tagName === 'INPUT') return;
-
-                    if (e.key === 'Escape') {
-                        UIModule.toggleStats(false);
-                        UIModule.toggleSettings(false);
-                        return;
-                    }
-
-                    if (e.code === 'Space') {
-                        e.preventDefault();
+            // Initialize keyboard shortcuts via AppInput module
+            const initKeyboardShortcuts = () => {
+                AppInput.init({
+                    onToggleTimer: () => {
                         const state = TimerModule.getState();
                         if (state.isRunning) {
                             TimerModule.pause();
@@ -2513,12 +2872,17 @@
                             TimerModule.start();
                         }
                         UIModule.updatePlayPauseButton(TimerModule.getState().isRunning);
-                    }
-
-                    if (e.code === 'KeyR') {
-                        TimerModule.reset();
-                        UIModule.updateTimer(TimerModule.getState());
-                        UIModule.updatePlayPauseButton(false);
+                    },
+                    onEscape: () => {
+                        UIModule.toggleStats(false);
+                        UIModule.toggleSettings(false);
+                    },
+                    onNewTask: () => {
+                        const { elements } = UIModule;
+                        if (elements.taskInput) {
+                            elements.taskInput.focus();
+                            elements.taskInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
                     }
                 });
             };
