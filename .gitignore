@@ -1,0 +1,24 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# IDE and Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs (if you run a local dev server)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Node modules (just in case you use a local linter/formatter)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build directories (future proofing)
+dist/
+build/
