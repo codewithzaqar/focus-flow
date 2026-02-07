@@ -1,9 +1,12 @@
 /* ============================================
-   CSS STYLES - FocusFlow v0.0.3.dev1
+   CSS STYLES - FocusFlow v0.0.3.dev2
    Mobile-First Glassmorphism Design
-   Multi-File Architecture
+   Multi-File Architecture with Theming
    ============================================ */
 
+/* ========================================
+   Theme: Default (Slate/Blue)
+   ======================================== */
 :root {
     /* Colors */
     --bg-primary: #0a0a0f;
@@ -32,6 +35,10 @@
     --accent: var(--accent-focus);
     --accent-glow: var(--accent-focus-glow);
     
+    /* Background gradient for theme */
+    --bg-grad-1: var(--accent-glow);
+    --bg-grad-2: rgba(139, 92, 246, 0.15);
+    
     /* Sizing */
     --radius-sm: 8px;
     --radius-md: 12px;
@@ -48,6 +55,61 @@
     --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
     --shadow-glow: 0 0 40px var(--accent-glow);
+}
+
+/* ========================================
+   Theme: Midnight (Deep Black/Purple - OLED)
+   ======================================== */
+[data-theme="midnight"] {
+    --bg-primary: #000000;
+    --bg-secondary: rgba(10, 10, 18, 0.9);
+    --bg-glass: rgba(255, 255, 255, 0.02);
+    --bg-glass-hover: rgba(255, 255, 255, 0.05);
+    --border-glass: rgba(139, 92, 246, 0.15);
+    --border-glass-light: rgba(139, 92, 246, 0.25);
+    
+    --text-primary: #e8e8f0;
+    --text-secondary: rgba(232, 232, 240, 0.55);
+    --text-muted: rgba(232, 232, 240, 0.35);
+    
+    --accent-focus: #a855f7;
+    --accent-focus-glow: rgba(168, 85, 247, 0.5);
+    --accent-short: #22d3ee;
+    --accent-short-glow: rgba(34, 211, 238, 0.4);
+    --accent-long: #c084fc;
+    --accent-long-glow: rgba(192, 132, 252, 0.4);
+    
+    --bg-grad-1: rgba(168, 85, 247, 0.2);
+    --bg-grad-2: rgba(139, 92, 246, 0.1);
+}
+
+/* ========================================
+   Theme: Forest (Dark Green/Emerald - Calming)
+   ======================================== */
+[data-theme="forest"] {
+    --bg-primary: #0a120e;
+    --bg-secondary: rgba(15, 30, 22, 0.88);
+    --bg-glass: rgba(16, 185, 129, 0.03);
+    --bg-glass-hover: rgba(16, 185, 129, 0.08);
+    --border-glass: rgba(16, 185, 129, 0.12);
+    --border-glass-light: rgba(16, 185, 129, 0.22);
+    
+    --text-primary: #e8f5e9;
+    --text-secondary: rgba(232, 245, 233, 0.6);
+    --text-muted: rgba(232, 245, 233, 0.4);
+    
+    --accent-focus: #10b981;
+    --accent-focus-glow: rgba(16, 185, 129, 0.45);
+    --accent-short: #34d399;
+    --accent-short-glow: rgba(52, 211, 153, 0.4);
+    --accent-long: #059669;
+    --accent-long-glow: rgba(5, 150, 105, 0.4);
+    --accent-warning: #fbbf24;
+    
+    --success: #34d399;
+    
+    --bg-grad-1: rgba(16, 185, 129, 0.2);
+    --bg-grad-2: rgba(5, 150, 105, 0.12);
 }
 
 /* ========================================
@@ -76,6 +138,7 @@ body {
     align-items: center;
     padding: 1rem 1rem 5rem;
     overflow-x: hidden;
+    transition: background var(--transition-slow), color var(--transition-base);
 }
 
 /* Animated background gradient */
@@ -86,8 +149,8 @@ body::before {
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle at 30% 30%, var(--accent-glow) 0%, transparent 50%),
-                radial-gradient(circle at 70% 70%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+    background: radial-gradient(circle at 30% 30%, var(--bg-grad-1) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, var(--bg-grad-2) 0%, transparent 50%);
     opacity: 0.5;
     z-index: -1;
     transition: background var(--transition-slow);
@@ -117,6 +180,7 @@ body::before {
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
+    transition: background var(--transition-base), border-color var(--transition-base);
 }
 
 /* ========================================
@@ -143,6 +207,7 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background var(--transition-base);
 }
 
 .brand-icon svg {
@@ -525,6 +590,14 @@ body::before {
     border-color: var(--accent);
 }
 
+[data-theme="midnight"] .task-item.active {
+    background: rgba(168, 85, 247, 0.15);
+}
+
+[data-theme="forest"] .task-item.active {
+    background: rgba(16, 185, 129, 0.15);
+}
+
 .task-item.completed {
     opacity: 0.5;
 }
@@ -616,6 +689,15 @@ body::before {
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border-glass);
     z-index: 50;
+    transition: background var(--transition-base), border-color var(--transition-base);
+}
+
+[data-theme="midnight"] .bottom-nav {
+    background: rgba(0, 0, 0, 0.95);
+}
+
+[data-theme="forest"] .bottom-nav {
+    background: rgba(10, 18, 14, 0.92);
 }
 
 .nav-btn {
@@ -685,7 +767,15 @@ body::before {
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     transform: scale(0.95) translateY(10px);
-    transition: transform var(--transition-slow);
+    transition: transform var(--transition-slow), background var(--transition-base);
+}
+
+[data-theme="midnight"] .modal {
+    background: linear-gradient(180deg, rgba(10, 10, 18, 0.98), rgba(5, 5, 12, 0.98));
+}
+
+[data-theme="forest"] .modal {
+    background: linear-gradient(180deg, rgba(15, 30, 22, 0.98), rgba(10, 20, 15, 0.98));
 }
 
 .modal-overlay.visible .modal {
@@ -762,6 +852,73 @@ body::before {
     gap: 0.5rem;
     font-size: 0.9rem;
     color: var(--text-secondary);
+}
+
+/* Theme Selector */
+.theme-selector {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.theme-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.5rem;
+    background: var(--bg-glass);
+    border: 2px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.theme-btn:hover {
+    background: var(--bg-glass-hover);
+    border-color: var(--border-glass-light);
+}
+
+.theme-btn.active {
+    border-color: var(--accent);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme="midnight"] .theme-btn.active {
+    background: rgba(168, 85, 247, 0.1);
+}
+
+[data-theme="forest"] .theme-btn.active {
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.theme-preview {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.theme-preview-default {
+    background: linear-gradient(135deg, #0a0a0f 50%, #6366f1 50%);
+}
+
+.theme-preview-midnight {
+    background: linear-gradient(135deg, #000000 50%, #a855f7 50%);
+}
+
+.theme-preview-forest {
+    background: linear-gradient(135deg, #0a120e 50%, #10b981 50%);
+}
+
+.theme-name {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.theme-btn.active .theme-name {
+    color: var(--accent);
 }
 
 .toggle-switch {
@@ -950,9 +1107,31 @@ body::before {
     color: var(--accent-focus);
 }
 
+[data-theme="midnight"] .data-btn.primary-action {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.3);
+    color: #a855f7;
+}
+
+[data-theme="forest"] .data-btn.primary-action {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
 .data-btn.primary-action:hover {
     background: rgba(99, 102, 241, 0.25);
     border-color: rgba(99, 102, 241, 0.5);
+}
+
+[data-theme="midnight"] .data-btn.primary-action:hover {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+[data-theme="forest"] .data-btn.primary-action:hover {
+    background: rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.5);
 }
 
 .file-input-hidden {
@@ -992,6 +1171,72 @@ body::before {
 }
 
 /* ========================================
+   Shortcuts Help Modal
+   ======================================== */
+.shortcuts-modal {
+    max-width: 340px;
+}
+
+.shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+}
+
+.shortcut-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-glass-hover);
+    border: 1px solid var(--border-glass-light);
+    border-radius: var(--radius-sm);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: capitalize;
+}
+
+.shortcut-desc {
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.shortcuts-tip {
+    text-align: center;
+    padding: 0.75rem;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    color: var(--accent);
+}
+
+[data-theme="midnight"] .shortcuts-tip {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.2);
+}
+
+[data-theme="forest"] .shortcuts-tip {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* ========================================
    Stats Panel (Slide-up Dashboard)
    ======================================== */
 .stats-overlay {
@@ -1023,8 +1268,16 @@ body::before {
     padding: 1.25rem;
     z-index: 101;
     transform: translateY(100%);
-    transition: transform var(--transition-slow);
+    transition: transform var(--transition-slow), background var(--transition-base);
     overflow-y: auto;
+}
+
+[data-theme="midnight"] .stats-panel {
+    background: linear-gradient(180deg, rgba(10, 10, 18, 0.98), rgba(0, 0, 0, 0.98));
+}
+
+[data-theme="forest"] .stats-panel {
+    background: linear-gradient(180deg, rgba(15, 30, 22, 0.98), rgba(10, 18, 14, 0.98));
 }
 
 .stats-overlay.visible .stats-panel {
@@ -1202,6 +1455,19 @@ body::before {
 
     .timer-display {
         font-size: 2.5rem;
+    }
+    
+    .nav-btn {
+        padding: 0.5rem 1rem;
+    }
+    
+    .theme-btn {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .theme-preview {
+        width: 28px;
+        height: 28px;
     }
 }
 

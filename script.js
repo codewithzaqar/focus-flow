@@ -1,5 +1,5 @@
 /* ============================================
-   FOCUSFLOW v0.0.3.dev1 - JavaScript
+   FOCUSFLOW v0.0.3.dev2 - JavaScript
    Multi-File Architecture Build
    ============================================
    
@@ -11,11 +11,12 @@
    5. AudioModule - Web Audio API brown noise (lazy init)
    6. ChartModule - Canvas API bar chart
    7. ConfettiModule - Celebration effect
-   8. SettingsModule - User preferences (with custom duration)
-   9. UIModule - DOM interactions
-   10. AppData - Data backup/restore (JSON Export/Import)
-   11. AppInput - Keyboard shortcut handler
-   12. App - Main initialization
+   8. SettingsModule - User preferences (with custom duration + theme)
+   9. ThemeModule - Theme switching (Default/Midnight/Forest)
+   10. UIModule - DOM interactions
+   11. AppData - Data backup/restore (JSON Export/Import)
+   12. AppInput - Keyboard shortcut handler
+   13. App - Main initialization
    
    ============================================ */
 
@@ -29,7 +30,8 @@ const StorageModule = (() => {
     const KEYS = {
         TASKS: 'focusflow_tasks_v2',
         HISTORY: 'ff_history',
-        SETTINGS: 'focusflow_settings_v2'
+        SETTINGS: 'focusflow_settings_v2',
+        THEME: 'focusflow_theme'
     };
 
     const get = (key, fallback = null) => {
@@ -634,6 +636,11 @@ const ChartModule = (() => {
             ctx.fillText(value.toString(), padding.left - 6, y + 3);
         }
 
+        // Get current theme accent color for chart bars
+        const computedStyle = getComputedStyle(document.documentElement);
+        const accentColor = computedStyle.getPropertyValue('--accent-focus').trim() || '#6366f1';
+        const accentLong = computedStyle.getPropertyValue('--accent-long').trim() || '#8b5cf6';
+
         // Bars
         const barCount = data.length;
         const barWidth = (chartWidth / barCount) * 0.55;
@@ -645,8 +652,8 @@ const ChartModule = (() => {
             const y = padding.top + chartHeight - barHeight;
 
             const gradient = ctx.createLinearGradient(x, y + barHeight, x, y);
-            gradient.addColorStop(0, '#6366f1');
-            gradient.addColorStop(1, '#8b5cf6');
+            gradient.addColorStop(0, accentColor);
+            gradient.addColorStop(1, accentLong);
 
             ctx.fillStyle = value > 0 ? gradient : 'rgba(255,255,255,0.1)';
             ctx.beginPath();
@@ -778,7 +785,51 @@ const SettingsModule = (() => {
 
 
 /* ============================================
-   MODULE 9: UIModule
+   MODULE 9: ThemeModule
+   Theme switching (Default/Midnight/Forest)
+   Persists to localStorage
+   ============================================ */
+const ThemeModule = (() => {
+    const THEMES = ['default', 'midnight', 'forest'];
+    const DEFAULT_THEME = 'default';
+
+    const get = () => {
+        const stored = StorageModule.get(StorageModule.KEYS.THEME, DEFAULT_THEME);
+        return THEMES.includes(stored) ? stored : DEFAULT_THEME;
+    };
+
+    const set = (theme) => {
+        if (!THEMES.includes(theme)) {
+            theme = DEFAULT_THEME;
+        }
+        
+        StorageModule.set(StorageModule.KEYS.THEME, theme);
+        apply(theme);
+        return theme;
+    };
+
+    const apply = (theme) => {
+        const body = document.body;
+        
+        if (theme === 'default') {
+            body.removeAttribute('data-theme');
+        } else {
+            body.setAttribute('data-theme', theme);
+        }
+    };
+
+    const init = () => {
+        const theme = get();
+        apply(theme);
+        return theme;
+    };
+
+    return { THEMES, get, set, apply, init };
+})();
+
+
+/* ============================================
+   MODULE 10: UIModule
    DOM manipulation and event handling
    ============================================ */
 const UIModule = (() => {
@@ -822,6 +873,13 @@ const UIModule = (() => {
         elements.statTotalSessions = $('#statTotalSessions');
         elements.statAvgSession = $('#statAvgSession');
         elements.statStreak = $('#statStreak');
+        // Theme elements
+        elements.themeSelector = $('#themeSelector');
+        elements.themeBtns = $$('.theme-btn');
+        // Shortcuts modal elements
+        elements.shortcutsBtn = $('#shortcutsBtn');
+        elements.shortcutsModal = $('#shortcutsModal');
+        elements.shortcutsClose = $('#shortcutsClose');
     };
 
     const updateTimer = (state) => {
@@ -932,6 +990,12 @@ const UIModule = (() => {
         }
     };
 
+    const toggleShortcuts = (show) => {
+        if (elements.shortcutsModal) {
+            elements.shortcutsModal.classList.toggle('visible', show);
+        }
+    };
+
     const updateStatsDisplay = () => {
         const stats = HistoryModule.getStats();
         const streak = HistoryModule.getStreak();
@@ -961,6 +1025,12 @@ const UIModule = (() => {
         }
     };
 
+    const updateThemeButtons = (activeTheme) => {
+        elements.themeBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === activeTheme);
+        });
+    };
+
     const notify = (title, body) => {
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
@@ -985,9 +1055,11 @@ const UIModule = (() => {
         renderTasks,
         toggleSettings,
         toggleStats,
+        toggleShortcuts,
         updateStatsDisplay,
         updateAudioToggle,
         updateVolumeDisplay,
+        updateThemeButtons,
         notify,
         requestNotificationPermission
     };
@@ -995,7 +1067,7 @@ const UIModule = (() => {
 
 
 /* ============================================
-   MODULE 10: AppData
+   MODULE 11: AppData
    Data Backup System (JSON Export/Import)
    Handles file I/O for localStorage backup/restore
    ============================================ */
@@ -1004,18 +1076,20 @@ const AppData = (() => {
     const BACKUP_KEYS = {
         tasks: 'focusflow_tasks_v2',
         history: 'ff_history',
-        settings: 'focusflow_settings_v2'
+        settings: 'focusflow_settings_v2',
+        theme: 'focusflow_theme'
     };
 
     // Export all data to JSON
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.3.dev1',
+                version: 'v0.0.3.dev2',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
-                ff_settings: StorageModule.get(BACKUP_KEYS.settings, SettingsModule.DEFAULT_SETTINGS)
+                ff_settings: StorageModule.get(BACKUP_KEYS.settings, SettingsModule.DEFAULT_SETTINGS),
+                ff_theme: StorageModule.get(BACKUP_KEYS.theme, 'default')
             };
 
             const jsonString = JSON.stringify(backup, null, 2);
@@ -1114,6 +1188,9 @@ const AppData = (() => {
                     if (data.ff_settings) {
                         StorageModule.set(BACKUP_KEYS.settings, data.ff_settings);
                     }
+                    if (data.ff_theme) {
+                        StorageModule.set(BACKUP_KEYS.theme, data.ff_theme);
+                    }
 
                     resolve({ success: true, reloadRequired: true });
                 } catch (parseError) {
@@ -1138,7 +1215,7 @@ const AppData = (() => {
 
 
 /* ============================================
-   MODULE 11: AppInput
+   MODULE 12: AppInput
    Keyboard Shortcuts Handler
    ============================================ */
 const AppInput = (() => {
@@ -1208,7 +1285,7 @@ const AppInput = (() => {
 
 
 /* ============================================
-   MODULE 12: App
+   MODULE 13: App
    Main application initialization & events
    ============================================ */
 const App = (() => {
@@ -1219,6 +1296,10 @@ const App = (() => {
         UIModule.cache();
         TaskModule.init();
         ChartModule.init('focusChart');
+        
+        // Initialize theme
+        const currentTheme = ThemeModule.init();
+        UIModule.updateThemeButtons(currentTheme);
 
         TimerModule.setCallbacks(onTimerTick, onTimerComplete);
 
@@ -1239,7 +1320,7 @@ const App = (() => {
         initKeyboardShortcuts();
         UIModule.requestNotificationPermission();
 
-        console.log('FocusFlow v0.0.3.dev1 (Multi-File Build) initialized');
+        console.log('FocusFlow v0.0.3.dev2 (Multi-File Build) initialized');
     };
 
     // Initialize custom duration input with saved value
@@ -1410,6 +1491,30 @@ const App = (() => {
             }
         });
 
+        // Theme selector
+        elements.themeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const theme = btn.dataset.theme;
+                ThemeModule.set(theme);
+                UIModule.updateThemeButtons(theme);
+            });
+        });
+
+        // Shortcuts modal
+        elements.shortcutsBtn?.addEventListener('click', () => {
+            UIModule.toggleShortcuts(true);
+        });
+
+        elements.shortcutsClose?.addEventListener('click', () => {
+            UIModule.toggleShortcuts(false);
+        });
+
+        elements.shortcutsModal?.addEventListener('click', (e) => {
+            if (e.target === elements.shortcutsModal) {
+                UIModule.toggleShortcuts(false);
+            }
+        });
+
         // Audio toggle (lazy init on user interaction)
         elements.audioToggle?.addEventListener('click', () => {
             const isPlaying = AudioModule.toggle();
@@ -1537,6 +1642,7 @@ const App = (() => {
             onEscape: () => {
                 UIModule.toggleStats(false);
                 UIModule.toggleSettings(false);
+                UIModule.toggleShortcuts(false);
             },
             onNewTask: () => {
                 const { elements } = UIModule;
