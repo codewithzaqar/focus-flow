@@ -22,3 +22,5 @@ yarn.lock
 # Build directories (future proofing)
 dist/
 build/
+
+nul

@@ -1,54 +1,103 @@
 # FocusFlow
 
-![Version](https://img.shields.io/badge/version-v0.0.2-blue.svg)
+![Version](https://img.shields.io/badge/version-v0.0.3-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Size](https://img.shields.io/badge/size-%3C20KB-orange.svg)
 
-**FocusFlow** is a lightweight, privacy-focused productivity application designed to help you enter flow states. It combines a Pomodoro timer, a task management queue, native analytics, and a generative audio engine—all contained within a **single HTML file**.
+A privacy-first productivity application designed to help you achieve and sustain deep focus. FocusFlow combines a precision Pomodoro timer, task queue, ambient audio engine, and visual analytics into a seamless workflow tool.
 
-No servers, no tracking, no external dependencies.
+No accounts. No tracking. No external dependencies. Your data stays on your device.
 
-## ✨ Features (v0.0.2)
+---
 
-*   **⏱️ Precision Timer:** Drift-corrected logic using `Date.now()` ensures accuracy even when the tab is backgrounded.
-*   **📝 Task Queue:** Add, prioritize, and check off tasks. "Active" tasks are highlighted to keep you focused on one thing at a time.
-*   **📊 Native Analytics:** visualizing your focus history over the last 7 days using the HTML5 Canvas API.
-*   **🔊 Generative Audio Engine:** Integrated "Brown Noise" generator (via Web Audio API) with volume control to mask distractions.
-*   **💾 Local Persistence:** All data (tasks, history, settings) is stored in your browser's `localStorage`. Your data never leaves your device.
-*   **🎉 Rewards:** Satisfying animations and confetti effects upon session completion.
+## Why FocusFlow?
 
-## 🚀 Getting Started
+Productivity isn't about doing more—it's about protecting your attention. FocusFlow creates the conditions for **flow state**: that rare zone where time dissolves and deep work happens naturally. By combining proven focus techniques with ambient audio and distraction-free design, FocusFlow helps you stop multitasking and start finishing.
+
+---
+
+## Key Features
+
+### Core Functionality
+- **Precision Timer** — Drift-corrected Pomodoro logic using `Date.now()` ensures accuracy even when browser tabs are backgrounded.
+- **Task Queue** — Add, prioritize, and complete tasks. The active task stays highlighted to maintain single-task focus.
+- **Session Analytics** — Canvas-rendered bar charts visualize your focus history over the last 7 days.
+
+### Audio Engine
+- **Brown Noise Generator** — Web Audio API-powered ambient sound with adjustable volume to mask distractions and promote concentration.
+
+### Customization (New in v0.0.3)
+- **Theme Switcher** — Three visual themes to match your environment:
+  - **Default** — Slate/Blue professional dark theme
+  - **Midnight** — Pure black OLED-optimized with purple accents
+  - **Forest** — Calming dark green/emerald palette
+- **Custom Focus Duration** — Set your preferred focus session length (1-120 minutes).
+- **Data Backup** — Export and import all your data as JSON for backup or device migration.
+
+### Privacy by Design
+- All data persists in browser `localStorage`
+- Zero network requests
+- No analytics or telemetry
+
+---
+
+## Keyboard Shortcuts
+
+| Key       | Action                     |
+|-----------|----------------------------|
+| `Space`   | Toggle Timer (Play/Pause)  |
+| `N`       | Focus New Task Input       |
+| `Esc`     | Close Open Modals          |
+
+---
+
+## Installation
 
 ### Prerequisites
-*   A modern web browser (Chrome, Firefox, Safari, Edge).
-*   That's it. No Node.js, Python, or servers required.
+- A modern web browser (Chrome, Firefox, Safari, Edge)
 
-### Installation
-1.  Clone this repository:
-    ```bash
-    git clone https://github.com/yourusername/focusflow.git
-    ```
-2.  Navigate to the folder:
-    ```bash
-    cd focusflow
-    ```
-3.  **Run the app:**
-    Double-click `index.html` to open it in your browser.
+### Quick Start
 
-## 🛠️ Tech Stack
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/focusflow.git
+   ```
 
-*   **Core:** HTML5, CSS3, Vanilla JavaScript (ES6+).
-*   **State Management:** Reactive Object pattern (No frameworks).
-*   **Data:** Browser `localStorage`.
-*   **Audio:** Web Audio API (Oscillators and GainNodes).
-*   **Graphics:** HTML5 Canvas (2D Context).
+2. Navigate to the project directory:
+   ```bash
+   cd focusflow
+   ```
 
-## 📂 Project Structure
+3. Open `index.html` in your browser.
 
-This project utilizes a **Single File Architecture (SFA)**.
+No build step. No dependencies. No configuration.
 
-```text
+---
+
+## Project Structure
+
+```
 focusflow/
-├── index.html       # The entire application (Logic, Styles, Markup)
-├── README.md        # Documentation
-└── .gitignore       # Git configuration
+├── index.html      # Application markup and structure
+├── style.css       # Glassmorphism UI styles with theming
+├── script.js       # Modular JavaScript (13 modules)
+└── README.md       # Documentation
+```
+
+---
+
+## Tech Stack
+
+| Layer         | Technology                          |
+|---------------|-------------------------------------|
+| Markup        | HTML5                               |
+| Styling       | CSS3 (Custom Properties, Glassmorphism) |
+| Logic         | Vanilla JavaScript (ES6+ Modules)   |
+| Audio         | Web Audio API                       |
+| Graphics      | HTML5 Canvas 2D                     |
+| Persistence   | localStorage                        |
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.

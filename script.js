@@ -1,5 +1,5 @@
 /* ============================================
-   FOCUSFLOW v0.0.3.dev2 - JavaScript
+   FOCUSFLOW v0.0.3 - JavaScript
    Multi-File Architecture Build
    ============================================
    
@@ -39,7 +39,6 @@ const StorageModule = (() => {
             const data = localStorage.getItem(key);
             return data ? JSON.parse(data) : fallback;
         } catch (e) {
-            console.warn('StorageModule.get error:', e);
             return fallback;
         }
     };
@@ -49,7 +48,6 @@ const StorageModule = (() => {
             localStorage.setItem(key, JSON.stringify(value));
             return true;
         } catch (e) {
-            console.warn('StorageModule.set error:', e);
             return false;
         }
     };
@@ -476,7 +474,6 @@ const AudioModule = (() => {
             isInitialized = true;
             return true;
         } catch (e) {
-            console.warn('AudioModule.init error:', e);
             return false;
         }
     };
@@ -1084,7 +1081,7 @@ const AppData = (() => {
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.3.dev2',
+                version: 'v0.0.3',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
@@ -1109,7 +1106,6 @@ const AppData = (() => {
 
             return { success: true };
         } catch (error) {
-            console.error('AppData.exportData error:', error);
             return { success: false, error: error.message };
         }
     };
@@ -1194,7 +1190,6 @@ const AppData = (() => {
 
                     resolve({ success: true, reloadRequired: true });
                 } catch (parseError) {
-                    console.error('AppData.importData parse error:', parseError);
                     resolve({ 
                         success: false, 
                         error: 'Failed to parse JSON file: ' + parseError.message 
@@ -1319,8 +1314,6 @@ const App = (() => {
         bindEvents();
         initKeyboardShortcuts();
         UIModule.requestNotificationPermission();
-
-        console.log('FocusFlow v0.0.3.dev2 (Multi-File Build) initialized');
     };
 
     // Initialize custom duration input with saved value
