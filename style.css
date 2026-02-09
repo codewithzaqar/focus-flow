@@ -1,7 +1,7 @@
 /* ============================================
-   CSS STYLES - FocusFlow v0.0.3
+   CSS STYLES - FocusFlow v0.0.4.dev0
    Mobile-First Glassmorphism Design
-   Multi-File Architecture with Theming
+   Multi-File Architecture with Theming (PWA)
    ============================================ */
 
 /* ========================================
@@ -1168,6 +1168,52 @@ body::before {
 
 .version-info strong {
     color: var(--accent);
+}
+
+/* Install App Button (PWA CTA) */
+.install-app-btn {
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.875rem 1.25rem;
+    background: linear-gradient(135deg, var(--accent-focus), var(--accent-long));
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all var(--transition-base);
+    box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.install-app-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px var(--accent-glow);
+    filter: brightness(1.1);
+}
+
+.install-app-btn:active {
+    transform: translateY(0);
+}
+
+.install-app-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+}
+
+[data-theme="midnight"] .install-app-btn {
+    background: linear-gradient(135deg, #a855f7, #c084fc);
+}
+
+[data-theme="forest"] .install-app-btn {
+    background: linear-gradient(135deg, #10b981, #34d399);
 }
 
 /* ========================================

@@ -1,6 +1,6 @@
 /* ============================================
-   FOCUSFLOW v0.0.3 - JavaScript
-   Multi-File Architecture Build
+   FOCUSFLOW v0.0.4.dev0 - JavaScript
+   Multi-File Architecture Build (PWA Edition)
    ============================================
    
    Modular Architecture:
@@ -16,7 +16,8 @@
    10. UIModule - DOM interactions
    11. AppData - Data backup/restore (JSON Export/Import)
    12. AppInput - Keyboard shortcut handler
-   13. App - Main initialization
+   13. App.PWA - Service Worker registration & install prompt
+   14. App - Main initialization
    
    ============================================ */
 
@@ -877,6 +878,8 @@ const UIModule = (() => {
         elements.shortcutsBtn = $('#shortcutsBtn');
         elements.shortcutsModal = $('#shortcutsModal');
         elements.shortcutsClose = $('#shortcutsClose');
+        // Install App button (PWA)
+        elements.installAppBtn = $('#installAppBtn');
     };
 
     const updateTimer = (state) => {
@@ -1081,7 +1084,7 @@ const AppData = (() => {
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.3',
+                version: 'v0.0.4.dev0',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
@@ -1280,7 +1283,150 @@ const AppInput = (() => {
 
 
 /* ============================================
-   MODULE 13: App
+   MODULE 13: App.PWA
+   Service Worker Registration & Install Prompt
+   ============================================ */
+const AppPWA = (() => {
+    let deferredPrompt = null;
+    let isInstalled = false;
+
+    // Register Service Worker
+    const registerServiceWorker = async () => {
+        if (!('serviceWorker' in navigator)) {
+            console.log('[PWA] Service Workers not supported');
+            return false;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js', {
+                scope: '/'
+            });
+
+            console.log('[PWA] Service Worker registered successfully:', registration.scope);
+
+            // Handle updates
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                console.log('[PWA] Service Worker update found');
+
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('[PWA] New content available; please refresh');
+                    }
+                });
+            });
+
+            return true;
+        } catch (error) {
+            console.error('[PWA] Service Worker registration failed:', error);
+            return false;
+        }
+    };
+
+    // Listen for beforeinstallprompt event
+    const listenForInstallPrompt = () => {
+        window.addEventListener('beforeinstallprompt', (event) => {
+            // Prevent the default browser install prompt
+            event.preventDefault();
+            
+            // Save the event for later use
+            deferredPrompt = event;
+            
+            console.log('[PWA] Install prompt captured and deferred');
+            
+            // Show the install button in settings
+            showInstallButton();
+        });
+
+        // Listen for app installed event
+        window.addEventListener('appinstalled', () => {
+            console.log('[PWA] App was installed successfully');
+            isInstalled = true;
+            deferredPrompt = null;
+            hideInstallButton();
+        });
+
+        // Check if already installed (standalone mode)
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('[PWA] App is running in standalone mode (installed)');
+            isInstalled = true;
+        }
+    };
+
+    // Show the install button
+    const showInstallButton = () => {
+        const { elements } = UIModule;
+        if (elements.installAppBtn) {
+            elements.installAppBtn.style.display = 'flex';
+        }
+    };
+
+    // Hide the install button
+    const hideInstallButton = () => {
+        const { elements } = UIModule;
+        if (elements.installAppBtn) {
+            elements.installAppBtn.style.display = 'none';
+        }
+    };
+
+    // Trigger the native install prompt
+    const promptInstall = async () => {
+        if (!deferredPrompt) {
+            console.log('[PWA] No install prompt available');
+            return false;
+        }
+
+        // Show the native install prompt
+        deferredPrompt.prompt();
+        
+        // Wait for user response
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        console.log('[PWA] User install choice:', outcome);
+        
+        // Clear the deferred prompt
+        deferredPrompt = null;
+        
+        if (outcome === 'accepted') {
+            hideInstallButton();
+            return true;
+        }
+        
+        return false;
+    };
+
+    // Bind install button click event
+    const bindInstallButton = () => {
+        const { elements } = UIModule;
+        elements.installAppBtn?.addEventListener('click', () => {
+            promptInstall();
+        });
+    };
+
+    // Initialize PWA features
+    const init = () => {
+        registerServiceWorker();
+        listenForInstallPrompt();
+        bindInstallButton();
+    };
+
+    // Check if app can be installed
+    const canInstall = () => deferredPrompt !== null;
+
+    // Check if app is installed
+    const isAppInstalled = () => isInstalled;
+
+    return {
+        init,
+        promptInstall,
+        canInstall,
+        isAppInstalled
+    };
+})();
+
+
+/* ============================================
+   MODULE 14: App
    Main application initialization & events
    ============================================ */
 const App = (() => {
@@ -1295,6 +1441,9 @@ const App = (() => {
         // Initialize theme
         const currentTheme = ThemeModule.init();
         UIModule.updateThemeButtons(currentTheme);
+
+        // Initialize PWA (Service Worker + Install Prompt)
+        AppPWA.init();
 
         TimerModule.setCallbacks(onTimerTick, onTimerComplete);
 

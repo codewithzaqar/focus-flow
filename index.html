@@ -7,6 +7,8 @@
     <meta name="theme-color" content="#0a0a0f">
     <title>FocusFlow</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M13 2L3 14h9l-1 8 10-12h-9l1-8z'/></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='36' fill='%230a0a0f'/><path d='M96 22L40 100h50l-6 58 56-78H90l6-58z' fill='%236366f1'/></svg>">
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -182,8 +184,12 @@
             <div class="settings-section">
                 <div class="settings-label">About</div>
                 <div class="version-info">
-                    <strong>FocusFlow</strong> v0.0.3
+                    <strong>FocusFlow</strong> v0.0.4.dev0
                 </div>
+                <button class="install-app-btn" id="installAppBtn" style="display: none;">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Install App
+                </button>
             </div>
         </div>
     </div>
