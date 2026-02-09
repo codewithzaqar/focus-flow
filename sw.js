@@ -1,9 +1,10 @@
 /* ============================================
-   FocusFlow Service Worker v0.0.4.dev0
+   FocusFlow Service Worker v0.0.4.dev1
    Cache First, Network Fallback Strategy
+   With skipWaiting message handler for updates
    ============================================ */
 
-const CACHE_NAME = 'focusflow-v0.0.4.dev0';
+const CACHE_NAME = 'focusflow-v0.0.4.dev1';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -27,8 +28,7 @@ self.addEventListener('install', (event) => {
             })
             .then(() => {
                 console.log('[SW] All core assets cached successfully');
-                // Skip waiting to activate immediately
-                return self.skipWaiting();
+                // Do NOT skipWaiting automatically - wait for user action
             })
             .catch((error) => {
                 console.error('[SW] Failed to cache assets:', error);
@@ -75,17 +75,17 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
-    console.log('[SW] Fetch intercepted:', event.request.url);
+    // Skip non-GET requests
+    if (event.request.method !== 'GET') {
+        return;
+    }
     
     event.respondWith(
         caches.match(event.request)
             .then((cachedResponse) => {
                 if (cachedResponse) {
-                    console.log('[SW] Serving from cache:', event.request.url);
                     return cachedResponse;
                 }
-                
-                console.log('[SW] Cache miss, fetching from network:', event.request.url);
                 
                 return fetch(event.request)
                     .then((networkResponse) => {
@@ -99,7 +99,6 @@ self.addEventListener('fetch', (event) => {
                         
                         caches.open(CACHE_NAME)
                             .then((cache) => {
-                                console.log('[SW] Caching new resource:', event.request.url);
                                 cache.put(event.request, responseToCache);
                             });
                         
@@ -122,4 +121,15 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-console.log('[SW] Service Worker script loaded');
+/* ============================================
+   MESSAGE EVENT
+   Handle skipWaiting message from client
+   ============================================ */
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        console.log('[SW] Received SKIP_WAITING message, activating new version');
+        self.skipWaiting();
+    }
+});
+
+console.log('[SW] Service Worker script loaded - v0.0.4.dev1');

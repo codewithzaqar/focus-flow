@@ -1,5 +1,5 @@
 /* ============================================
-   CSS STYLES - FocusFlow v0.0.4.dev0
+   CSS STYLES - FocusFlow v0.0.4.dev1
    Mobile-First Glassmorphism Design
    Multi-File Architecture with Theming (PWA)
    ============================================ */
@@ -253,6 +253,42 @@ body::before {
     stroke: currentColor;
     fill: none;
     stroke-width: 1.5;
+}
+
+/* ========================================
+   Offline Badge
+   ======================================== */
+.offline-badge {
+    display: none;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--danger);
+    animation: offlinePulse 2s ease-in-out infinite;
+}
+
+.offline-badge.visible {
+    display: flex;
+}
+
+.offline-badge svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+@keyframes offlinePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
 
 /* ========================================
@@ -1438,6 +1474,89 @@ body::before {
 }
 
 /* ========================================
+   Update Toast Notification
+   ======================================== */
+.update-toast {
+    position: fixed;
+    bottom: 5.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(150%);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(139, 92, 246, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-full);
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+    z-index: 300;
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--transition-slow);
+}
+
+.update-toast.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+[data-theme="midnight"] .update-toast {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.95), rgba(192, 132, 252, 0.95));
+    box-shadow: 0 8px 32px rgba(168, 85, 247, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="forest"] .update-toast {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(52, 211, 153, 0.95));
+    box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.update-toast-message {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: white;
+    white-space: nowrap;
+}
+
+.update-toast-btn {
+    padding: 0.4rem 0.85rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-full);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.update-toast-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.update-toast-dismiss {
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.update-toast-dismiss:hover {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+/* ========================================
    Confetti Animation
    ======================================== */
 .confetti-container {
@@ -1514,6 +1633,17 @@ body::before {
     .theme-preview {
         width: 28px;
         height: 28px;
+    }
+    
+    .update-toast {
+        left: 1rem;
+        right: 1rem;
+        transform: translateX(0) translateY(150%);
+        border-radius: var(--radius-md);
+    }
+    
+    .update-toast.visible {
+        transform: translateX(0) translateY(0);
     }
 }
 

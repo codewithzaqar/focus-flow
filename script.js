@@ -1,5 +1,5 @@
 /* ============================================
-   FOCUSFLOW v0.0.4.dev0 - JavaScript
+   FOCUSFLOW v0.0.4.dev1 - JavaScript
    Multi-File Architecture Build (PWA Edition)
    ============================================
    
@@ -7,7 +7,7 @@
    1. StorageModule - localStorage management
    2. HistoryModule - ff_history analytics storage
    3. TaskModule - Task queue CRUD operations
-   4. TimerModule - Pomodoro timer logic (with Date.now precision)
+   4. TimerModule - Pomodoro timer logic (with Date.now precision + persistence)
    5. AudioModule - Web Audio API brown noise (lazy init)
    6. ChartModule - Canvas API bar chart
    7. ConfettiModule - Celebration effect
@@ -16,8 +16,9 @@
    10. UIModule - DOM interactions
    11. AppData - Data backup/restore (JSON Export/Import)
    12. AppInput - Keyboard shortcut handler
-   13. App.PWA - Service Worker registration & install prompt
-   14. App - Main initialization
+   13. AppNetwork - Online/Offline detection
+   14. App.PWA - Service Worker registration, install prompt, & update detection
+   15. App - Main initialization
    
    ============================================ */
 
@@ -32,7 +33,8 @@ const StorageModule = (() => {
         TASKS: 'focusflow_tasks_v2',
         HISTORY: 'ff_history',
         SETTINGS: 'focusflow_settings_v2',
-        THEME: 'focusflow_theme'
+        THEME: 'focusflow_theme',
+        TIMER_STATE: 'focusflow_timer_state'
     };
 
     const get = (key, fallback = null) => {
@@ -292,6 +294,7 @@ const TaskModule = (() => {
    MODULE 4: TimerModule
    Pomodoro timer with Date.now() precision
    Handles tab switching correctly
+   NOW WITH STATE PERSISTENCE
    ============================================ */
 const TimerModule = (() => {
     const CIRCUMFERENCE = 2 * Math.PI * 108;
@@ -309,6 +312,68 @@ const TimerModule = (() => {
     let callbacks = {
         onTick: null,
         onComplete: null
+    };
+
+    // Save timer state to localStorage
+    const saveState = () => {
+        const persistState = {
+            mode: state.mode,
+            isRunning: state.isRunning,
+            remainingSeconds: state.remainingSeconds,
+            totalSeconds: state.totalSeconds,
+            targetEndTime: state.isRunning ? Date.now() + (state.remainingSeconds * 1000) : null,
+            savedAt: Date.now()
+        };
+        StorageModule.set(StorageModule.KEYS.TIMER_STATE, persistState);
+    };
+
+    // Clear persisted state
+    const clearPersistedState = () => {
+        StorageModule.remove(StorageModule.KEYS.TIMER_STATE);
+    };
+
+    // Restore timer state from localStorage
+    const restoreState = () => {
+        const saved = StorageModule.get(StorageModule.KEYS.TIMER_STATE, null);
+        if (!saved) return null;
+
+        const now = Date.now();
+        
+        // If timer was running
+        if (saved.isRunning && saved.targetEndTime) {
+            const remainingMs = saved.targetEndTime - now;
+            
+            if (remainingMs <= 0) {
+                // Timer completed while app was closed
+                clearPersistedState();
+                return { 
+                    completed: true, 
+                    mode: saved.mode,
+                    totalSeconds: saved.totalSeconds
+                };
+            } else {
+                // Timer still has time remaining
+                const remainingSeconds = Math.ceil(remainingMs / 1000);
+                return {
+                    completed: false,
+                    mode: saved.mode,
+                    isRunning: true,
+                    remainingSeconds: remainingSeconds,
+                    totalSeconds: saved.totalSeconds
+                };
+            }
+        } else if (!saved.isRunning && saved.remainingSeconds > 0) {
+            // Timer was paused
+            return {
+                completed: false,
+                mode: saved.mode,
+                isRunning: false,
+                remainingSeconds: saved.remainingSeconds,
+                totalSeconds: saved.totalSeconds
+            };
+        }
+
+        return null;
     };
 
     const setDuration = (seconds) => {
@@ -349,12 +414,16 @@ const TimerModule = (() => {
     const tick = () => {
         state.remainingSeconds = calculateRemaining();
         
+        // Save state on each tick for persistence
+        saveState();
+        
         if (callbacks.onTick) {
             callbacks.onTick(getState());
         }
         
         if (state.remainingSeconds <= 0) {
             stop();
+            clearPersistedState();
             if (callbacks.onComplete) {
                 callbacks.onComplete(state.mode);
             }
@@ -368,6 +437,9 @@ const TimerModule = (() => {
         // Store the starting point
         state.pausedRemaining = state.remainingSeconds;
         state.startTime = Date.now();
+        
+        // Save state immediately
+        saveState();
         
         // Use setInterval for visual updates, but calculate from Date.now()
         state.intervalId = setInterval(tick, 1000);
@@ -389,6 +461,9 @@ const TimerModule = (() => {
             clearInterval(state.intervalId);
             state.intervalId = null;
         }
+        
+        // Save paused state
+        saveState();
     };
 
     const stop = () => {
@@ -400,6 +475,7 @@ const TimerModule = (() => {
         state.remainingSeconds = state.totalSeconds;
         state.pausedRemaining = null;
         state.startTime = null;
+        clearPersistedState();
     };
 
     const getState = () => ({
@@ -424,10 +500,25 @@ const TimerModule = (() => {
         return Math.floor(state.totalSeconds / 60);
     };
 
+    // Apply restored state (called during init)
+    const applyRestoredState = (restored) => {
+        state.mode = restored.mode;
+        state.remainingSeconds = restored.remainingSeconds;
+        state.totalSeconds = restored.totalSeconds;
+        
+        if (restored.isRunning) {
+            state.pausedRemaining = restored.remainingSeconds;
+            state.startTime = Date.now();
+            state.isRunning = true;
+            state.intervalId = setInterval(tick, 1000);
+        }
+    };
+
     return { 
         setDuration, setMode, formatTime, 
         start, pause, stop, reset, 
-        getState, setCallbacks, getElapsedMinutes, getDurationMinutes
+        getState, setCallbacks, getElapsedMinutes, getDurationMinutes,
+        restoreState, applyRestoredState, clearPersistedState, saveState
     };
 })();
 
@@ -880,6 +971,12 @@ const UIModule = (() => {
         elements.shortcutsClose = $('#shortcutsClose');
         // Install App button (PWA)
         elements.installAppBtn = $('#installAppBtn');
+        // Offline badge
+        elements.offlineBadge = $('#offlineBadge');
+        // Update toast
+        elements.updateToast = $('#updateToast');
+        elements.updateToastBtn = $('#updateToastBtn');
+        elements.updateToastDismiss = $('#updateToastDismiss');
     };
 
     const updateTimer = (state) => {
@@ -1031,6 +1128,20 @@ const UIModule = (() => {
         });
     };
 
+    // Offline badge
+    const showOfflineBadge = (show) => {
+        if (elements.offlineBadge) {
+            elements.offlineBadge.classList.toggle('visible', show);
+        }
+    };
+
+    // Update toast
+    const showUpdateToast = (show) => {
+        if (elements.updateToast) {
+            elements.updateToast.classList.toggle('visible', show);
+        }
+    };
+
     const notify = (title, body) => {
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
@@ -1060,6 +1171,8 @@ const UIModule = (() => {
         updateAudioToggle,
         updateVolumeDisplay,
         updateThemeButtons,
+        showOfflineBadge,
+        showUpdateToast,
         notify,
         requestNotificationPermission
     };
@@ -1084,7 +1197,7 @@ const AppData = (() => {
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.4.dev0',
+                version: 'v0.0.4.dev1',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
@@ -1283,12 +1396,53 @@ const AppInput = (() => {
 
 
 /* ============================================
-   MODULE 13: App.PWA
-   Service Worker Registration & Install Prompt
+   MODULE 13: AppNetwork
+   Online/Offline Detection and UI Updates
+   ============================================ */
+const AppNetwork = (() => {
+    let isOnline = navigator.onLine;
+
+    const init = () => {
+        // Set initial state
+        isOnline = navigator.onLine;
+        updateUI();
+
+        // Listen for online/offline events
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+    };
+
+    const handleOnline = () => {
+        console.log('[Network] Connection restored');
+        isOnline = true;
+        updateUI();
+    };
+
+    const handleOffline = () => {
+        console.log('[Network] Connection lost');
+        isOnline = false;
+        updateUI();
+    };
+
+    const updateUI = () => {
+        UIModule.showOfflineBadge(!isOnline);
+    };
+
+    const getStatus = () => isOnline;
+
+    return { init, getStatus };
+})();
+
+
+/* ============================================
+   MODULE 14: App.PWA
+   Service Worker Registration, Install Prompt,
+   & Update Detection with Toast Notification
    ============================================ */
 const AppPWA = (() => {
     let deferredPrompt = null;
     let isInstalled = false;
+    let waitingWorker = null;
 
     // Register Service Worker
     const registerServiceWorker = async () => {
@@ -1304,6 +1458,13 @@ const AppPWA = (() => {
 
             console.log('[PWA] Service Worker registered successfully:', registration.scope);
 
+            // Check for waiting worker on page load
+            if (registration.waiting) {
+                console.log('[PWA] Update available on load');
+                waitingWorker = registration.waiting;
+                showUpdateToast();
+            }
+
             // Handle updates
             registration.addEventListener('updatefound', () => {
                 const newWorker = registration.installing;
@@ -1312,8 +1473,16 @@ const AppPWA = (() => {
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                         console.log('[PWA] New content available; please refresh');
+                        waitingWorker = newWorker;
+                        showUpdateToast();
                     }
                 });
+            });
+
+            // Listen for controller change (after skipWaiting)
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('[PWA] Controller changed, reloading page');
+                window.location.reload();
             });
 
             return true;
@@ -1321,6 +1490,36 @@ const AppPWA = (() => {
             console.error('[PWA] Service Worker registration failed:', error);
             return false;
         }
+    };
+
+    // Show update toast notification
+    const showUpdateToast = () => {
+        UIModule.showUpdateToast(true);
+    };
+
+    // Hide update toast
+    const hideUpdateToast = () => {
+        UIModule.showUpdateToast(false);
+    };
+
+    // Apply the update by telling waiting SW to skip waiting
+    const applyUpdate = () => {
+        if (waitingWorker) {
+            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+        }
+    };
+
+    // Bind update toast buttons
+    const bindUpdateToastEvents = () => {
+        const { elements } = UIModule;
+        
+        elements.updateToastBtn?.addEventListener('click', () => {
+            applyUpdate();
+        });
+
+        elements.updateToastDismiss?.addEventListener('click', () => {
+            hideUpdateToast();
+        });
     };
 
     // Listen for beforeinstallprompt event
@@ -1408,6 +1607,7 @@ const AppPWA = (() => {
         registerServiceWorker();
         listenForInstallPrompt();
         bindInstallButton();
+        bindUpdateToastEvents();
     };
 
     // Check if app can be installed
@@ -1420,13 +1620,14 @@ const AppPWA = (() => {
         init,
         promptInstall,
         canInstall,
-        isAppInstalled
+        isAppInstalled,
+        applyUpdate
     };
 })();
 
 
 /* ============================================
-   MODULE 14: App
+   MODULE 15: App
    Main application initialization & events
    ============================================ */
 const App = (() => {
@@ -1442,12 +1643,22 @@ const App = (() => {
         const currentTheme = ThemeModule.init();
         UIModule.updateThemeButtons(currentTheme);
 
-        // Initialize PWA (Service Worker + Install Prompt)
+        // Initialize Network status monitoring
+        AppNetwork.init();
+
+        // Initialize PWA (Service Worker + Install Prompt + Update Detection)
         AppPWA.init();
 
         TimerModule.setCallbacks(onTimerTick, onTimerComplete);
 
-        setMode('focus');
+        // Check for persisted timer state
+        const restoredState = TimerModule.restoreState();
+        if (restoredState) {
+            handleRestoredTimerState(restoredState);
+        } else {
+            setMode('focus');
+        }
+
         UIModule.renderTasks();
 
         // Initialize volume display
@@ -1463,6 +1674,68 @@ const App = (() => {
         bindEvents();
         initKeyboardShortcuts();
         UIModule.requestNotificationPermission();
+
+        // Save timer state on visibility change (user leaves/returns to app)
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+    };
+
+    // Handle restored timer state from localStorage
+    const handleRestoredTimerState = (restored) => {
+        if (restored.completed) {
+            // Timer completed while app was closed
+            console.log('[Timer] Session completed while app was closed');
+            
+            // Record the session if it was a focus session
+            if (restored.mode === 'focus') {
+                const duration = Math.floor(restored.totalSeconds / 60);
+                const activeTask = TaskModule.getActive();
+                HistoryModule.recordSession(
+                    duration,
+                    activeTask?.id || null,
+                    activeTask?.name || null
+                );
+                
+                // Show notification
+                UIModule.notify(
+                    'Focus Session Complete!',
+                    `Great work! You focused for ${duration} minutes while away.`
+                );
+                
+                // Launch confetti
+                ConfettiModule.launch();
+                AudioModule.playBeep();
+            }
+            
+            // Auto advance to next mode
+            const todayStats = HistoryModule.getTodayStats();
+            const nextMode = restored.mode === 'focus' 
+                ? (todayStats.sessions % 4 === 0 ? 'long' : 'short')
+                : 'focus';
+            setMode(nextMode);
+        } else {
+            // Timer has remaining time - resume it
+            console.log('[Timer] Resuming timer with', restored.remainingSeconds, 'seconds remaining');
+            
+            currentMode = restored.mode;
+            UIModule.setMode(restored.mode);
+            TimerModule.applyRestoredState(restored);
+            UIModule.updateTimer(TimerModule.getState());
+            UIModule.updatePlayPauseButton(restored.isRunning);
+        }
+    };
+
+    // Handle page visibility changes
+    const handleVisibilityChange = () => {
+        if (document.hidden) {
+            // User is leaving the page - state is already saved on each tick
+            console.log('[Timer] Page hidden, state persisted');
+        } else {
+            // User returned - recalculate timer if running
+            const state = TimerModule.getState();
+            if (state.isRunning) {
+                UIModule.updateTimer(state);
+            }
+        }
     };
 
     // Initialize custom duration input with saved value
@@ -1482,6 +1755,7 @@ const App = (() => {
 
     const setMode = (mode) => {
         TimerModule.pause();
+        TimerModule.clearPersistedState();
         currentMode = mode;
         
         const duration = SettingsModule.getModeDuration(mode);

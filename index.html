@@ -21,6 +21,11 @@
                 </div>
                 <span class="brand-name">FocusFlow</span>
             </div>
+            <!-- Offline Badge -->
+            <div class="offline-badge" id="offlineBadge">
+                <svg viewBox="0 0 24 24"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+                <span>Offline</span>
+            </div>
         </header>
 
         <!-- Timer Section -->
@@ -184,7 +189,7 @@
             <div class="settings-section">
                 <div class="settings-label">About</div>
                 <div class="version-info">
-                    <strong>FocusFlow</strong> v0.0.4.dev0
+                    <strong>FocusFlow</strong> v0.0.4.dev1
                 </div>
                 <button class="install-app-btn" id="installAppBtn" style="display: none;">
                     <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -263,6 +268,13 @@
 
     <!-- Confetti Container -->
     <div class="confetti-container" id="confettiContainer"></div>
+
+    <!-- Update Toast Notification -->
+    <div class="update-toast" id="updateToast">
+        <span class="update-toast-message">New version available</span>
+        <button class="update-toast-btn" id="updateToastBtn">Reload</button>
+        <button class="update-toast-dismiss" id="updateToastDismiss" aria-label="Dismiss">&times;</button>
+    </div>
 
     <!-- JavaScript -->
     <script src="script.js"></script>
