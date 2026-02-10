@@ -1,5 +1,5 @@
 /* ============================================
-   FOCUSFLOW v0.0.4.dev3 - JavaScript
+   FOCUSFLOW v0.0.4 - JavaScript
    Multi-File Architecture Build (PWA Edition)
    Advanced PWA: Shortcuts, WCO, Wake Lock, Media Session, Haptics, Badging
    ============================================
@@ -1202,7 +1202,7 @@ const AppData = (() => {
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.4.dev3',
+                version: 'v0.0.4',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
@@ -1418,13 +1418,11 @@ const AppNetwork = (() => {
     };
 
     const handleOnline = () => {
-        console.log('[Network] Connection restored');
         isOnline = true;
         updateUI();
     };
 
     const handleOffline = () => {
-        console.log('[Network] Connection lost');
         isOnline = false;
         updateUI();
     };
@@ -1452,7 +1450,6 @@ const AppPWA = (() => {
     // Register Service Worker
     const registerServiceWorker = async () => {
         if (!('serviceWorker' in navigator)) {
-            console.log('[PWA] Service Workers not supported');
             return false;
         }
 
@@ -1461,11 +1458,9 @@ const AppPWA = (() => {
                 scope: '/'
             });
 
-            console.log('[PWA] Service Worker registered successfully:', registration.scope);
 
             // Check for waiting worker on page load
             if (registration.waiting) {
-                console.log('[PWA] Update available on load');
                 waitingWorker = registration.waiting;
                 showUpdateToast();
             }
@@ -1473,11 +1468,9 @@ const AppPWA = (() => {
             // Handle updates
             registration.addEventListener('updatefound', () => {
                 const newWorker = registration.installing;
-                console.log('[PWA] Service Worker update found');
 
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        console.log('[PWA] New content available; please refresh');
                         waitingWorker = newWorker;
                         showUpdateToast();
                     }
@@ -1486,13 +1479,11 @@ const AppPWA = (() => {
 
             // Listen for controller change (after skipWaiting)
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                console.log('[PWA] Controller changed, reloading page');
                 window.location.reload();
             });
 
             return true;
         } catch (error) {
-            console.error('[PWA] Service Worker registration failed:', error);
             return false;
         }
     };
@@ -1536,7 +1527,6 @@ const AppPWA = (() => {
             // Save the event for later use
             deferredPrompt = event;
             
-            console.log('[PWA] Install prompt captured and deferred');
             
             // Show the install button in settings
             showInstallButton();
@@ -1544,7 +1534,6 @@ const AppPWA = (() => {
 
         // Listen for app installed event
         window.addEventListener('appinstalled', () => {
-            console.log('[PWA] App was installed successfully');
             isInstalled = true;
             deferredPrompt = null;
             hideInstallButton();
@@ -1552,7 +1541,6 @@ const AppPWA = (() => {
 
         // Check if already installed (standalone mode)
         if (window.matchMedia('(display-mode: standalone)').matches) {
-            console.log('[PWA] App is running in standalone mode (installed)');
             isInstalled = true;
         }
     };
@@ -1576,7 +1564,6 @@ const AppPWA = (() => {
     // Trigger the native install prompt
     const promptInstall = async () => {
         if (!deferredPrompt) {
-            console.log('[PWA] No install prompt available');
             return false;
         }
 
@@ -1586,7 +1573,6 @@ const AppPWA = (() => {
         // Wait for user response
         const { outcome } = await deferredPrompt.userChoice;
         
-        console.log('[PWA] User install choice:', outcome);
         
         // Clear the deferred prompt
         deferredPrompt = null;
@@ -1643,7 +1629,6 @@ const WakeLockModule = (() => {
 
     const request = async () => {
         if (!isSupported) {
-            console.log('[WakeLock] API not supported in this browser');
             return false;
         }
 
@@ -1654,17 +1639,14 @@ const WakeLockModule = (() => {
             }
 
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log('[WakeLock] Screen lock acquired');
 
             // Listen for release events (e.g., when user switches tabs)
             wakeLock.addEventListener('release', () => {
-                console.log('[WakeLock] Screen lock released');
                 wakeLock = null;
             });
 
             return true;
         } catch (error) {
-            console.error('[WakeLock] Failed to acquire screen lock:', error.message);
             return false;
         }
     };
@@ -1674,9 +1656,7 @@ const WakeLockModule = (() => {
             try {
                 await wakeLock.release();
                 wakeLock = null;
-                console.log('[WakeLock] Screen lock manually released');
             } catch (error) {
-                console.error('[WakeLock] Error releasing lock:', error.message);
             }
         }
     };
@@ -1689,7 +1669,6 @@ const WakeLockModule = (() => {
     // Re-acquire wake lock when page becomes visible again
     const handleVisibilityChange = async () => {
         if (wakeLock !== null && document.visibilityState === 'visible') {
-            console.log('[WakeLock] Page visible again, re-acquiring lock');
             await request();
         }
     };
@@ -1720,7 +1699,6 @@ const MediaSessionModule = (() => {
     // Initialize media session metadata
     const init = () => {
         if (!isSupported) {
-            console.log('[MediaSession] API not supported in this browser');
             return false;
         }
 
@@ -1737,14 +1715,12 @@ const MediaSessionModule = (() => {
 
             // Set up action handlers for hardware buttons
             navigator.mediaSession.setActionHandler('play', () => {
-                console.log('[MediaSession] Play action triggered');
                 // Toggle audio on
                 const isPlaying = AudioModule.toggle();
                 UIModule.updateAudioToggle(isPlaying);
             });
 
             navigator.mediaSession.setActionHandler('pause', () => {
-                console.log('[MediaSession] Pause action triggered');
                 // Toggle audio off
                 const isPlaying = AudioModule.toggle();
                 UIModule.updateAudioToggle(isPlaying);
@@ -1753,10 +1729,8 @@ const MediaSessionModule = (() => {
             // Set initial playback state
             updatePlaybackState(false);
 
-            console.log('[MediaSession] Media session initialized');
             return true;
         } catch (error) {
-            console.error('[MediaSession] Failed to initialize:', error.message);
             return false;
         }
     };
@@ -1768,7 +1742,6 @@ const MediaSessionModule = (() => {
         try {
             navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
         } catch (error) {
-            console.error('[MediaSession] Failed to update playback state:', error.message);
         }
     };
 
@@ -1792,17 +1765,14 @@ const HapticsModule = (() => {
     // Light tick feedback for task completion
     const taskComplete = () => {
         if (!isSupported) {
-            console.log('[Haptics] Vibration API not supported');
             return false;
         }
 
         try {
             // Short, crisp tick (10ms)
             navigator.vibrate(10);
-            console.log('[Haptics] Task complete vibration triggered');
             return true;
         } catch (error) {
-            console.error('[Haptics] Failed to vibrate:', error.message);
             return false;
         }
     };
@@ -1810,17 +1780,14 @@ const HapticsModule = (() => {
     // Heartbeat pattern for timer completion
     const timerComplete = () => {
         if (!isSupported) {
-            console.log('[Haptics] Vibration API not supported');
             return false;
         }
 
         try {
             // Heartbeat pattern: 200ms on, 100ms off, 200ms on
             navigator.vibrate([200, 100, 200]);
-            console.log('[Haptics] Timer complete vibration triggered');
             return true;
         } catch (error) {
-            console.error('[Haptics] Failed to vibrate:', error.message);
             return false;
         }
     };
@@ -1858,21 +1825,17 @@ const BadgeModule = (() => {
     // Set badge with a number (for active tasks)
     const setCount = async (count) => {
         if (!isSupported) {
-            console.log('[Badge] Badging API not supported');
             return false;
         }
 
         try {
             if (count > 0) {
                 await navigator.setAppBadge(count);
-                console.log('[Badge] Badge set to:', count);
             } else {
                 await navigator.clearAppBadge();
-                console.log('[Badge] Badge cleared');
             }
             return true;
         } catch (error) {
-            console.error('[Badge] Failed to set badge:', error.message);
             return false;
         }
     };
@@ -1880,16 +1843,13 @@ const BadgeModule = (() => {
     // Set generic dot badge (for timer running)
     const setIndicator = async () => {
         if (!isSupported) {
-            console.log('[Badge] Badging API not supported');
             return false;
         }
 
         try {
             await navigator.setAppBadge();
-            console.log('[Badge] Indicator badge set');
             return true;
         } catch (error) {
-            console.error('[Badge] Failed to set indicator:', error.message);
             return false;
         }
     };
@@ -1897,16 +1857,13 @@ const BadgeModule = (() => {
     // Clear badge
     const clear = async () => {
         if (!isSupported) {
-            console.log('[Badge] Badging API not supported');
             return false;
         }
 
         try {
             await navigator.clearAppBadge();
-            console.log('[Badge] Badge cleared');
             return true;
         } catch (error) {
-            console.error('[Badge] Failed to clear badge:', error.message);
             return false;
         }
     };
@@ -2000,14 +1957,12 @@ const App = (() => {
         const action = urlParams.get('action');
 
         if (action === 'focus') {
-            console.log('[App] Shortcut: Starting focus session');
             // Set to focus mode and start timer
             setMode('focus');
             TimerModule.start();
             WakeLockModule.request();
             UIModule.updatePlayPauseButton(true);
         } else if (action === 'addtask') {
-            console.log('[App] Shortcut: Focusing task input');
             // Focus and scroll to task input
             const { elements } = UIModule;
             if (elements.taskInput) {
@@ -2026,7 +1981,6 @@ const App = (() => {
     const handleRestoredTimerState = (restored) => {
         if (restored.completed) {
             // Timer completed while app was closed
-            console.log('[Timer] Session completed while app was closed');
             
             // Record the session if it was a focus session
             if (restored.mode === 'focus') {
@@ -2057,7 +2011,6 @@ const App = (() => {
             setMode(nextMode);
         } else {
             // Timer has remaining time - resume it
-            console.log('[Timer] Resuming timer with', restored.remainingSeconds, 'seconds remaining');
             
             currentMode = restored.mode;
             UIModule.setMode(restored.mode);
@@ -2071,7 +2024,6 @@ const App = (() => {
     const handleVisibilityChange = () => {
         if (document.hidden) {
             // User is leaving the page - state is already saved on each tick
-            console.log('[Timer] Page hidden, state persisted');
         } else {
             // User returned - recalculate timer if running
             const state = TimerModule.getState();

@@ -1,10 +1,10 @@
 /* ============================================
-   FocusFlow Service Worker v0.0.4.dev3
-   Cache First, Network Fallback Strategy
-   With skipWaiting message handler for updates
+   FocusFlow Service Worker v0.0.4
+   Stale-While-Revalidate Strategy
+   Serve from cache fast, update in background
    ============================================ */
 
-const CACHE_NAME = 'focusflow-v0.0.4.dev3';
+const CACHE_NAME = 'focusflow-v0.0.4';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -18,20 +18,13 @@ const ASSETS_TO_CACHE = [
    Cache core assets on first install
    ============================================ */
 self.addEventListener('install', (event) => {
-    console.log('[SW] Install event triggered');
-    
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('[SW] Caching core assets:', ASSETS_TO_CACHE);
                 return cache.addAll(ASSETS_TO_CACHE);
             })
             .then(() => {
-                console.log('[SW] All core assets cached successfully');
                 // Do NOT skipWaiting automatically - wait for user action
-            })
-            .catch((error) => {
-                console.error('[SW] Failed to cache assets:', error);
             })
     );
 });
@@ -41,8 +34,6 @@ self.addEventListener('install', (event) => {
    Clean up old caches
    ============================================ */
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activate event triggered');
-    
     event.waitUntil(
         caches.keys()
             .then((cacheNames) => {
@@ -50,13 +41,11 @@ self.addEventListener('activate', (event) => {
                     cacheNames
                         .filter((name) => name !== CACHE_NAME)
                         .map((name) => {
-                            console.log('[SW] Deleting old cache:', name);
                             return caches.delete(name);
                         })
                 );
             })
             .then(() => {
-                console.log('[SW] Old caches cleared, claiming clients');
                 // Take control of all pages immediately
                 return self.clients.claim();
             })
@@ -65,7 +54,8 @@ self.addEventListener('activate', (event) => {
 
 /* ============================================
    FETCH EVENT
-   Cache First, Network Fallback Strategy
+   Stale-While-Revalidate Strategy
+   Serve from cache immediately, update cache in background
    ============================================ */
 self.addEventListener('fetch', (event) => {
     const requestUrl = new URL(event.request.url);
@@ -83,40 +73,26 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         caches.match(event.request)
             .then((cachedResponse) => {
-                if (cachedResponse) {
-                    return cachedResponse;
-                }
-                
-                return fetch(event.request)
+                // Return cached response immediately (stale)
+                const fetchPromise = fetch(event.request)
                     .then((networkResponse) => {
-                        // Don't cache non-successful responses
-                        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-                            return networkResponse;
+                        // Update cache in background (revalidate)
+                        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+                            const responseToCache = networkResponse.clone();
+                            caches.open(CACHE_NAME)
+                                .then((cache) => {
+                                    cache.put(event.request, responseToCache);
+                                });
                         }
-                        
-                        // Clone the response since we need to use it twice
-                        const responseToCache = networkResponse.clone();
-                        
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                cache.put(event.request, responseToCache);
-                            });
-                        
                         return networkResponse;
                     })
-                    .catch((error) => {
-                        console.error('[SW] Network fetch failed:', error);
-                        
-                        // Return a fallback for navigation requests
-                        if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
-                        }
-                        
-                        return new Response('Offline', {
-                            status: 503,
-                            statusText: 'Service Unavailable'
-                        });
+                    .catch(() => {
+                        // Network failed, but we already returned cached version
+                        // This is fine - user gets stale content
                     });
+                
+                // Return cached response immediately, or fetch if not cached
+                return cachedResponse || fetchPromise;
             })
     );
 });
@@ -127,9 +103,6 @@ self.addEventListener('fetch', (event) => {
    ============================================ */
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
-        console.log('[SW] Received SKIP_WAITING message, activating new version');
         self.skipWaiting();
     }
 });
-
-console.log('[SW] Service Worker script loaded - v0.0.4.dev3');
