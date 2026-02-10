@@ -1,10 +1,10 @@
 /* ============================================
-   FocusFlow Service Worker v0.0.4.dev1
+   FocusFlow Service Worker v0.0.4.dev3
    Cache First, Network Fallback Strategy
    With skipWaiting message handler for updates
    ============================================ */
 
-const CACHE_NAME = 'focusflow-v0.0.4.dev2';
+const CACHE_NAME = 'focusflow-v0.0.4.dev3';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -132,4 +132,4 @@ self.addEventListener('message', (event) => {
     }
 });
 
-console.log('[SW] Service Worker script loaded - v0.0.4.dev2');
+console.log('[SW] Service Worker script loaded - v0.0.4.dev3');

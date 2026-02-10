@@ -1,7 +1,7 @@
 /* ============================================
-   FOCUSFLOW v0.0.4.dev2 - JavaScript
+   FOCUSFLOW v0.0.4.dev3 - JavaScript
    Multi-File Architecture Build (PWA Edition)
-   Advanced PWA: Shortcuts, WCO, Wake Lock
+   Advanced PWA: Shortcuts, WCO, Wake Lock, Media Session, Haptics, Badging
    ============================================
    
    Modular Architecture:
@@ -20,7 +20,10 @@
    13. AppNetwork - Online/Offline detection
    14. App.PWA - Service Worker registration, install prompt, & update detection
    15. WakeLockModule - Screen Wake Lock API (prevent sleep during timer)
-   16. App - Main initialization (with URL shortcut params)
+   16. MediaSessionModule - Media Session API (lock screen controls)
+   17. HapticsModule - Vibration API (tactile feedback)
+   18. BadgeModule - Badging API (app icon badges)
+   19. App - Main initialization (with URL shortcut params)
    
    ============================================ */
 
@@ -1199,7 +1202,7 @@ const AppData = (() => {
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.4.dev2',
+                version: 'v0.0.4.dev3',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
@@ -1706,7 +1709,237 @@ const WakeLockModule = (() => {
 
 
 /* ============================================
-   MODULE 16: App
+   MODULE 16: MediaSessionModule
+   Media Session API - Lock Screen Controls for Focus Noise
+   ============================================ */
+const MediaSessionModule = (() => {
+    let isSupported = 'mediaSession' in navigator;
+
+    const isAvailable = () => isSupported;
+
+    // Initialize media session metadata
+    const init = () => {
+        if (!isSupported) {
+            console.log('[MediaSession] API not supported in this browser');
+            return false;
+        }
+
+        try {
+            // Set metadata for lock screen display
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: 'Focus Mode',
+                artist: 'FocusFlow',
+                album: 'Brown Noise',
+                artwork: [
+                    { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" rx="20" fill="%236366f1"/><polygon points="38,28 68,48 38,68" fill="white"/></svg>', sizes: '96x96', type: 'image/svg+xml' }
+                ]
+            });
+
+            // Set up action handlers for hardware buttons
+            navigator.mediaSession.setActionHandler('play', () => {
+                console.log('[MediaSession] Play action triggered');
+                // Toggle audio on
+                const isPlaying = AudioModule.toggle();
+                UIModule.updateAudioToggle(isPlaying);
+            });
+
+            navigator.mediaSession.setActionHandler('pause', () => {
+                console.log('[MediaSession] Pause action triggered');
+                // Toggle audio off
+                const isPlaying = AudioModule.toggle();
+                UIModule.updateAudioToggle(isPlaying);
+            });
+
+            // Set initial playback state
+            updatePlaybackState(false);
+
+            console.log('[MediaSession] Media session initialized');
+            return true;
+        } catch (error) {
+            console.error('[MediaSession] Failed to initialize:', error.message);
+            return false;
+        }
+    };
+
+    // Update the playback state shown on lock screen
+    const updatePlaybackState = (isPlaying) => {
+        if (!isSupported) return;
+
+        try {
+            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+        } catch (error) {
+            console.error('[MediaSession] Failed to update playback state:', error.message);
+        }
+    };
+
+    return {
+        isAvailable,
+        init,
+        updatePlaybackState
+    };
+})();
+
+
+/* ============================================
+   MODULE 17: HapticsModule
+   Vibration API - Haptic feedback for user actions
+   ============================================ */
+const HapticsModule = (() => {
+    let isSupported = 'vibrate' in navigator;
+
+    const isAvailable = () => isSupported;
+
+    // Light tick feedback for task completion
+    const taskComplete = () => {
+        if (!isSupported) {
+            console.log('[Haptics] Vibration API not supported');
+            return false;
+        }
+
+        try {
+            // Short, crisp tick (10ms)
+            navigator.vibrate(10);
+            console.log('[Haptics] Task complete vibration triggered');
+            return true;
+        } catch (error) {
+            console.error('[Haptics] Failed to vibrate:', error.message);
+            return false;
+        }
+    };
+
+    // Heartbeat pattern for timer completion
+    const timerComplete = () => {
+        if (!isSupported) {
+            console.log('[Haptics] Vibration API not supported');
+            return false;
+        }
+
+        try {
+            // Heartbeat pattern: 200ms on, 100ms off, 200ms on
+            navigator.vibrate([200, 100, 200]);
+            console.log('[Haptics] Timer complete vibration triggered');
+            return true;
+        } catch (error) {
+            console.error('[Haptics] Failed to vibrate:', error.message);
+            return false;
+        }
+    };
+
+    // Generic light feedback
+    const lightFeedback = () => {
+        if (!isSupported) return false;
+
+        try {
+            navigator.vibrate(15);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    };
+
+    return {
+        isAvailable,
+        taskComplete,
+        timerComplete,
+        lightFeedback
+    };
+})();
+
+
+/* ============================================
+   MODULE 18: BadgeModule
+   Badging API - App icon badges for timer/tasks
+   ============================================ */
+const BadgeModule = (() => {
+    let isSupported = 'setAppBadge' in navigator;
+
+    const isAvailable = () => isSupported;
+
+    // Set badge with a number (for active tasks)
+    const setCount = async (count) => {
+        if (!isSupported) {
+            console.log('[Badge] Badging API not supported');
+            return false;
+        }
+
+        try {
+            if (count > 0) {
+                await navigator.setAppBadge(count);
+                console.log('[Badge] Badge set to:', count);
+            } else {
+                await navigator.clearAppBadge();
+                console.log('[Badge] Badge cleared');
+            }
+            return true;
+        } catch (error) {
+            console.error('[Badge] Failed to set badge:', error.message);
+            return false;
+        }
+    };
+
+    // Set generic dot badge (for timer running)
+    const setIndicator = async () => {
+        if (!isSupported) {
+            console.log('[Badge] Badging API not supported');
+            return false;
+        }
+
+        try {
+            await navigator.setAppBadge();
+            console.log('[Badge] Indicator badge set');
+            return true;
+        } catch (error) {
+            console.error('[Badge] Failed to set indicator:', error.message);
+            return false;
+        }
+    };
+
+    // Clear badge
+    const clear = async () => {
+        if (!isSupported) {
+            console.log('[Badge] Badging API not supported');
+            return false;
+        }
+
+        try {
+            await navigator.clearAppBadge();
+            console.log('[Badge] Badge cleared');
+            return true;
+        } catch (error) {
+            console.error('[Badge] Failed to clear badge:', error.message);
+            return false;
+        }
+    };
+
+    // Update badge based on app state
+    const updateFromState = async () => {
+        const timerState = TimerModule.getState();
+        const pendingTasks = TaskModule.getPendingCount();
+
+        if (timerState.isRunning) {
+            // Timer running: show indicator
+            await setIndicator();
+        } else if (pendingTasks > 0) {
+            // Tasks pending: show count
+            await setCount(pendingTasks);
+        } else {
+            // Nothing active: clear badge
+            await clear();
+        }
+    };
+
+    return {
+        isAvailable,
+        setCount,
+        setIndicator,
+        clear,
+        updateFromState
+    };
+})();
+
+
+/* ============================================
+   MODULE 19: App
    Main application initialization & events
    ============================================ */
 const App = (() => {
@@ -1886,6 +2119,12 @@ const App = (() => {
         // Release wake lock when timer completes
         WakeLockModule.release();
         
+        // Trigger haptic feedback for timer completion
+        HapticsModule.timerComplete();
+        
+        // Clear badge when timer completes
+        BadgeModule.clear();
+        
         AudioModule.playBeep();
         
         if (mode === 'focus') {
@@ -1936,6 +2175,8 @@ const App = (() => {
                 WakeLockModule.request();
             }
             UIModule.updatePlayPauseButton(TimerModule.getState().isRunning);
+            // Update badge when timer state changes
+            BadgeModule.updateFromState();
         });
 
         // Reset
@@ -1943,6 +2184,8 @@ const App = (() => {
             TimerModule.reset();
             UIModule.updateTimer(TimerModule.getState());
             UIModule.updatePlayPauseButton(false);
+            // Update badge when timer is reset
+            BadgeModule.updateFromState();
         });
 
         // Skip
@@ -1979,6 +2222,8 @@ const App = (() => {
                 TaskModule.add(name);
                 elements.taskInput.value = '';
                 UIModule.renderTasks();
+                // Update badge after adding task
+                BadgeModule.updateFromState();
             }
         };
 
@@ -1997,8 +2242,16 @@ const App = (() => {
 
             if (action === 'delete') {
                 TaskModule.remove(taskId);
+                // Update badge after task removal
+                BadgeModule.updateFromState();
             } else if (action === 'complete') {
-                TaskModule.toggleComplete(taskId);
+                const task = TaskModule.toggleComplete(taskId);
+                // Trigger haptic feedback when completing a task
+                if (task && task.completed) {
+                    HapticsModule.taskComplete();
+                }
+                // Update badge after task completion
+                BadgeModule.updateFromState();
             } else if (action === 'select' || !action) {
                 const task = TaskModule.getAll().find(t => t.id === taskId);
                 if (task && !task.completed) {
@@ -2052,6 +2305,12 @@ const App = (() => {
         elements.audioToggle?.addEventListener('click', () => {
             const isPlaying = AudioModule.toggle();
             UIModule.updateAudioToggle(isPlaying);
+            
+            // Initialize Media Session when audio is first toggled
+            if (isPlaying) {
+                MediaSessionModule.init();
+            }
+            MediaSessionModule.updatePlaybackState(isPlaying);
         });
 
         elements.audioToggle?.addEventListener('keypress', (e) => {
@@ -2086,6 +2345,8 @@ const App = (() => {
                 HistoryModule.clearHistory();
                 UIModule.updateStatsDisplay();
                 UIModule.toggleSettings(false);
+                // Update badge after clearing history
+                BadgeModule.updateFromState();
             }
         });
 
@@ -2119,6 +2380,9 @@ const App = (() => {
             } else {
                 alert('Import failed: ' + result.error);
             }
+            
+            // Update badge after import
+            BadgeModule.updateFromState();
         });
 
         // Timer display click - cycle mode
@@ -2173,6 +2437,8 @@ const App = (() => {
                     WakeLockModule.request();
                 }
                 UIModule.updatePlayPauseButton(TimerModule.getState().isRunning);
+                // Update badge when timer state changes via keyboard
+                BadgeModule.updateFromState();
             },
             onEscape: () => {
                 UIModule.toggleStats(false);
