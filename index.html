@@ -114,6 +114,18 @@
             </svg>
             <span>Settings</span>
         </button>
+        <button class="nav-btn" id="achievementsBtn" aria-label="Achievements">
+            <svg viewBox="0 0 24 24">
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+                <path d="M4 22h16"/>
+                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+                <circle cx="12" cy="9" r="6" fill="currentColor" fill-opacity="0.2"/>
+                <circle cx="12" cy="9" r="6"/>
+            </svg>
+            <span>Badges</span>
+        </button>
         <button class="nav-btn" id="statsBtn" aria-label="Statistics">
             <svg viewBox="0 0 24 24">
                 <line x1="18" y1="20" x2="18" y2="10"/>
@@ -233,6 +245,24 @@
 
             <div class="shortcuts-tip">
                 Pro tip: Use keyboard shortcuts for faster workflow!
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievements Modal -->
+    <div class="modal-overlay" id="achievementsModal">
+        <div class="modal achievements-modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Achievements</h2>
+                <button class="modal-close" id="achievementsClose" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="achievements-grid" id="achievementsGrid">
+                <!-- Badges will be rendered here by JS -->
+            </div>
+
+            <div class="achievements-tip">
+                Complete tasks and focus sessions to unlock badges!
             </div>
         </div>
     </div>

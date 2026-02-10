@@ -2,7 +2,7 @@
    FOCUSFLOW v0.0.5 - JavaScript
    Multi-File Architecture Build (PWA Edition)
    Advanced PWA: Shortcuts, WCO, Wake Lock, Media Session, Haptics, Badging
-   Gamification: Flow Level System (XP, Levels, Progress)
+   Gamification: Flow Level System (XP, Levels, Progress, Achievements)
    ============================================
    
    Modular Architecture:
@@ -25,7 +25,8 @@
    17. HapticsModule - Vibration API (tactile feedback)
    18. BadgeModule - Badging API (app icon badges)
    19. GamificationModule - XP, Levels, Flow Level system
-   20. App - Main initialization (with URL shortcut params)
+   20. AchievementModule - Badge/Achievement system
+   21. App - Main initialization (with URL shortcut params)
    
    ============================================ */
 
@@ -42,7 +43,8 @@ const StorageModule = (() => {
         SETTINGS: 'focusflow_settings_v2',
         THEME: 'focusflow_theme',
         TIMER_STATE: 'focusflow_timer_state',
-        GAMIFICATION: 'focusflow_gamification'
+        GAMIFICATION: 'focusflow_gamification',
+        ACHIEVEMENTS: 'ff_achievements'
     };
 
     const get = (key, fallback = null) => {
@@ -990,6 +992,11 @@ const UIModule = (() => {
         elements.xpBarFill = $('#xpBarFill');
         elements.xpText = $('#xpText');
         elements.xpFloatContainer = $('#xpFloatContainer');
+        // Achievement elements
+        elements.achievementsBtn = $('#achievementsBtn');
+        elements.achievementsModal = $('#achievementsModal');
+        elements.achievementsClose = $('#achievementsClose');
+        elements.achievementsGrid = $('#achievementsGrid');
     };
 
     const updateTimer = (state) => {
@@ -1210,6 +1217,73 @@ const UIModule = (() => {
         }
     };
 
+    // Toggle achievements modal
+    const toggleAchievements = (show) => {
+        if (elements.achievementsModal) {
+            elements.achievementsModal.classList.toggle('visible', show);
+            if (show) {
+                renderAchievements();
+            }
+        }
+    };
+
+    // Render achievements grid
+    const renderAchievements = () => {
+        if (!elements.achievementsGrid) return;
+
+        const badges = AchievementModule.getAllBadges();
+
+        elements.achievementsGrid.innerHTML = badges.map(badge => {
+            const unlockDate = badge.unlockedAt 
+                ? new Date(badge.unlockedAt).toLocaleDateString() 
+                : null;
+
+            return `
+                <div class="badge-item ${badge.unlocked ? 'unlocked' : 'locked'}">
+                    <div class="badge-icon">
+                        ${badge.icon}
+                    </div>
+                    <span class="badge-name">${badge.name}</span>
+                    <span class="badge-desc">${badge.description}</span>
+                    ${unlockDate ? `<span class="badge-unlock-date">${unlockDate}</span>` : ''}
+                </div>
+            `;
+        }).join('');
+    };
+
+    // Show achievement unlock toast
+    const showAchievementToast = (badgeName) => {
+        // Create toast element if it doesn't exist
+        let toast = document.getElementById('achievementToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'achievementToast';
+            toast.className = 'achievement-toast';
+            toast.innerHTML = `
+                <div class="achievement-toast-icon">
+                    <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><circle cx="12" cy="9" r="6"/></svg>
+                </div>
+                <div class="achievement-toast-content">
+                    <span class="achievement-toast-title">Achievement Unlocked</span>
+                    <span class="achievement-toast-name" id="achievementToastName"></span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+        }
+
+        // Update badge name
+        const nameEl = document.getElementById('achievementToastName');
+        if (nameEl) nameEl.textContent = badgeName;
+
+        // Show toast
+        toast.classList.add('visible');
+
+        // Hide after 4 seconds
+        setTimeout(() => {
+            toast.classList.remove('visible');
+        }, 4000);
+    };
+
     const notify = (title, body) => {
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
@@ -1235,6 +1309,9 @@ const UIModule = (() => {
         toggleSettings,
         toggleStats,
         toggleShortcuts,
+        toggleAchievements,
+        renderAchievements,
+        showAchievementToast,
         updateStatsDisplay,
         updateAudioToggle,
         updateVolumeDisplay,
@@ -1262,7 +1339,8 @@ const AppData = (() => {
         history: 'ff_history',
         settings: 'focusflow_settings_v2',
         theme: 'focusflow_theme',
-        gamification: 'focusflow_gamification'
+        gamification: 'focusflow_gamification',
+        achievements: 'ff_achievements'
     };
 
     // Export all data to JSON
@@ -1275,7 +1353,8 @@ const AppData = (() => {
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
                 ff_settings: StorageModule.get(BACKUP_KEYS.settings, SettingsModule.DEFAULT_SETTINGS),
                 ff_theme: StorageModule.get(BACKUP_KEYS.theme, 'default'),
-                ff_gamification: StorageModule.get(BACKUP_KEYS.gamification, { totalXP: 0 })
+                ff_gamification: StorageModule.get(BACKUP_KEYS.gamification, { totalXP: 0 }),
+                ff_achievements: StorageModule.get(BACKUP_KEYS.achievements, [])
             };
 
             const jsonString = JSON.stringify(backup, null, 2);
@@ -1378,6 +1457,9 @@ const AppData = (() => {
                     }
                     if (data.ff_gamification) {
                         StorageModule.set(BACKUP_KEYS.gamification, data.ff_gamification);
+                    }
+                    if (data.ff_achievements) {
+                        StorageModule.set(BACKUP_KEYS.achievements, data.ff_achievements);
                     }
 
                     resolve({ success: true, reloadRequired: true });
@@ -2070,7 +2152,153 @@ const GamificationModule = (() => {
 
 
 /* ============================================
-   MODULE 20: App
+   MODULE 20: AchievementModule
+   Badge/Achievement System
+   Tracks and awards unlockable badges
+   ============================================ */
+const AchievementModule = (() => {
+    // Badge definitions
+    const BADGES = {
+        NOVICE_FLOW: {
+            id: 'novice_flow',
+            name: 'Novice Flow',
+            description: 'Complete your first 25m session',
+            icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+            check: () => {
+                const records = HistoryModule.getRecords();
+                return records.some(r => r.duration >= 25);
+            }
+        },
+        TASK_MASTER: {
+            id: 'task_master',
+            name: 'Task Master',
+            description: 'Complete 10 tasks total',
+            icon: `<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+            check: () => {
+                const tasks = TaskModule.getAll();
+                return tasks.filter(t => t.completed).length >= 10;
+            }
+        },
+        MARATHONER: {
+            id: 'marathoner',
+            name: 'Marathoner',
+            description: 'Reach Level 5',
+            icon: `<svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><circle cx="12" cy="9" r="6"/></svg>`,
+            check: () => {
+                return GamificationModule.getLevel() >= 5;
+            }
+        },
+        NIGHT_OWL: {
+            id: 'night_owl',
+            name: 'Night Owl',
+            description: 'Complete a session after 10 PM',
+            icon: `<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
+            check: () => {
+                const records = HistoryModule.getRecords();
+                return records.some(r => {
+                    const date = new Date(r.timestamp);
+                    const hour = date.getHours();
+                    return hour >= 22 || hour < 5;
+                });
+            }
+        }
+    };
+
+    let unlockedBadges = [];
+
+    const init = () => {
+        const saved = StorageModule.get(StorageModule.KEYS.ACHIEVEMENTS, []);
+        unlockedBadges = Array.isArray(saved) ? saved : [];
+        checkAllAchievements();
+    };
+
+    const save = () => {
+        StorageModule.set(StorageModule.KEYS.ACHIEVEMENTS, unlockedBadges);
+    };
+
+    const isUnlocked = (badgeId) => {
+        return unlockedBadges.some(b => b.id === badgeId);
+    };
+
+    const unlockBadge = (badgeId) => {
+        if (isUnlocked(badgeId)) return null;
+
+        const badge = Object.values(BADGES).find(b => b.id === badgeId);
+        if (!badge) return null;
+
+        const unlockData = {
+            id: badgeId,
+            unlockedAt: Date.now()
+        };
+
+        unlockedBadges.push(unlockData);
+        save();
+
+        // Show notification
+        UIModule.showAchievementToast(badge.name);
+
+        // Play success sound (beep)
+        AudioModule.playBeep();
+
+        return badge;
+    };
+
+    const checkAllAchievements = () => {
+        let newUnlocks = [];
+
+        Object.values(BADGES).forEach(badge => {
+            if (!isUnlocked(badge.id)) {
+                if (badge.check()) {
+                    const unlocked = unlockBadge(badge.id);
+                    if (unlocked) newUnlocks.push(unlocked);
+                }
+            }
+        });
+
+        return newUnlocks;
+    };
+
+    const checkSpecific = (badgeId) => {
+        const badge = BADGES[badgeId];
+        if (!badge || isUnlocked(badge.id)) return null;
+
+        if (badge.check()) {
+            return unlockBadge(badge.id);
+        }
+
+        return null;
+    };
+
+    const getAllBadges = () => {
+        return Object.values(BADGES).map(badge => ({
+            ...badge,
+            unlocked: isUnlocked(badge.id),
+            unlockedAt: unlockedBadges.find(u => u.id === badge.id)?.unlockedAt
+        }));
+    };
+
+    const getUnlockedCount = () => unlockedBadges.length;
+
+    const reset = () => {
+        unlockedBadges = [];
+        save();
+    };
+
+    return {
+        init,
+        checkAllAchievements,
+        checkSpecific,
+        getAllBadges,
+        getUnlockedCount,
+        isUnlocked,
+        reset,
+        BADGES
+    };
+})();
+
+
+/* ============================================
+   MODULE 21: App
    Main application initialization & events
    ============================================ */
 const App = (() => {
@@ -2082,6 +2310,7 @@ const App = (() => {
         TaskModule.init();
         ChartModule.init('focusChart');
         GamificationModule.init();
+        AchievementModule.init();
         
         // Initialize theme
         const currentTheme = ThemeModule.init();
@@ -2175,7 +2404,12 @@ const App = (() => {
                 UIModule.updateXPDisplay();
                 if (xpResult?.leveledUp) {
                     UIModule.triggerLevelUp();
+                    AchievementModule.checkSpecific('MARATHONER');
                 }
+                
+                // Check session-based achievements
+                AchievementModule.checkSpecific('NOVICE_FLOW');
+                AchievementModule.checkSpecific('NIGHT_OWL');
                 
                 // Show notification
                 UIModule.notify(
@@ -2282,8 +2516,14 @@ const App = (() => {
                 UIModule.updateXPDisplay();
                 if (xpResult.leveledUp) {
                     UIModule.triggerLevelUp();
+                    // Check Marathoner achievement on level up
+                    AchievementModule.checkSpecific('MARATHONER');
                 }
             }
+            
+            // Check session-based achievements
+            AchievementModule.checkSpecific('NOVICE_FLOW');
+            AchievementModule.checkSpecific('NIGHT_OWL');
             
             // Launch confetti celebration
             ConfettiModule.launch();
@@ -2403,8 +2643,11 @@ const App = (() => {
                         UIModule.updateXPDisplay();
                         if (xpResult.leveledUp) {
                             UIModule.triggerLevelUp();
+                            AchievementModule.checkSpecific('MARATHONER');
                         }
                     }
+                    // Check Task Master achievement
+                    AchievementModule.checkSpecific('TASK_MASTER');
                 }
                 // Update badge after task completion
                 BadgeModule.updateFromState();
@@ -2457,6 +2700,21 @@ const App = (() => {
             }
         });
 
+        // Achievements modal
+        elements.achievementsBtn?.addEventListener('click', () => {
+            UIModule.toggleAchievements(true);
+        });
+
+        elements.achievementsClose?.addEventListener('click', () => {
+            UIModule.toggleAchievements(false);
+        });
+
+        elements.achievementsModal?.addEventListener('click', (e) => {
+            if (e.target === elements.achievementsModal) {
+                UIModule.toggleAchievements(false);
+            }
+        });
+
         // Audio toggle (lazy init on user interaction)
         elements.audioToggle?.addEventListener('click', () => {
             const isPlaying = AudioModule.toggle();
@@ -2497,9 +2755,10 @@ const App = (() => {
 
         // Clear history with confirmation
         elements.clearHistoryBtn?.addEventListener('click', () => {
-            if (confirm('Clear all focus history and XP progress? This action cannot be undone.')) {
+            if (confirm('Clear all focus history, XP progress, and achievements? This action cannot be undone.')) {
                 HistoryModule.clearHistory();
                 GamificationModule.reset();
+                AchievementModule.reset();
                 UIModule.updateStatsDisplay();
                 UIModule.updateXPDisplay();
                 UIModule.toggleSettings(false);
@@ -2602,6 +2861,7 @@ const App = (() => {
                 UIModule.toggleStats(false);
                 UIModule.toggleSettings(false);
                 UIModule.toggleShortcuts(false);
+                UIModule.toggleAchievements(false);
             },
             onNewTask: () => {
                 const { elements } = UIModule;
