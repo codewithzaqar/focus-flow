@@ -4,6 +4,7 @@
   "description": "A minimalist Pomodoro timer with task management and analytics",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay"],
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
   "orientation": "portrait-primary",
@@ -25,6 +26,34 @@
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Focus",
+      "short_name": "Focus",
+      "description": "Start a focus session immediately",
+      "url": "/index.html?action=focus",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' rx='20' fill='%236366f1'/><polygon points='38,28 68,48 38,68' fill='white'/></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Add Task",
+      "short_name": "Add Task",
+      "description": "Add a new task to your queue",
+      "url": "/index.html?action=addtask",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' rx='20' fill='%2310b981'/><path d='M48 28v40M28 48h40' stroke='white' stroke-width='6' stroke-linecap='round'/></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ],
   "categories": ["productivity", "utilities"],

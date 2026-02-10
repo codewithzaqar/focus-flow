@@ -4,7 +4,7 @@
    With skipWaiting message handler for updates
    ============================================ */
 
-const CACHE_NAME = 'focusflow-v0.0.4.dev1';
+const CACHE_NAME = 'focusflow-v0.0.4.dev2';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -132,4 +132,4 @@ self.addEventListener('message', (event) => {
     }
 });
 
-console.log('[SW] Service Worker script loaded - v0.0.4.dev1');
+console.log('[SW] Service Worker script loaded - v0.0.4.dev2');

@@ -1,7 +1,8 @@
 /* ============================================
-   CSS STYLES - FocusFlow v0.0.4.dev1
+   CSS STYLES - FocusFlow v0.0.4.dev2
    Mobile-First Glassmorphism Design
    Multi-File Architecture with Theming (PWA)
+   Advanced PWA: Shortcuts, WCO, Wake Lock
    ============================================ */
 
 /* ========================================
@@ -181,6 +182,47 @@ body::before {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
     transition: background var(--transition-base), border-color var(--transition-base);
+}
+
+/* ========================================
+   Window Controls Overlay (Desktop PWA)
+   ======================================== */
+@supports (app-region: drag) {
+    .header {
+        /* Add padding for native window controls on macOS/Windows */
+        padding-top: env(titlebar-area-height, 1rem);
+        padding-left: max(env(titlebar-area-x, 0px), 1.25rem);
+        padding-right: max(calc(100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%)), 1.25rem);
+    }
+    
+    .header .brand {
+        /* Make header draggable like native title bar */
+        app-region: drag;
+        -webkit-app-region: drag;
+    }
+    
+    .header .brand-icon,
+    .header .offline-badge,
+    .header-actions,
+    .header-actions .icon-btn {
+        /* Buttons should not be draggable */
+        app-region: no-drag;
+        -webkit-app-region: no-drag;
+    }
+}
+
+/* Fallback for browsers that support display-mode: window-controls-overlay */
+@media (display-mode: window-controls-overlay) {
+    body {
+        /* Ensure content doesn't overlap with title bar area */
+        padding-top: env(titlebar-area-height, 1rem);
+    }
+    
+    .header {
+        /* Adjust header for window controls overlay */
+        padding-top: 0.75rem;
+        padding-left: max(env(titlebar-area-x, 0px) + 0.5rem, 1.25rem);
+    }
 }
 
 /* ========================================

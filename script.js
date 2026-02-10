@@ -1,6 +1,7 @@
 /* ============================================
-   FOCUSFLOW v0.0.4.dev1 - JavaScript
+   FOCUSFLOW v0.0.4.dev2 - JavaScript
    Multi-File Architecture Build (PWA Edition)
+   Advanced PWA: Shortcuts, WCO, Wake Lock
    ============================================
    
    Modular Architecture:
@@ -18,7 +19,8 @@
    12. AppInput - Keyboard shortcut handler
    13. AppNetwork - Online/Offline detection
    14. App.PWA - Service Worker registration, install prompt, & update detection
-   15. App - Main initialization
+   15. WakeLockModule - Screen Wake Lock API (prevent sleep during timer)
+   16. App - Main initialization (with URL shortcut params)
    
    ============================================ */
 
@@ -1197,7 +1199,7 @@ const AppData = (() => {
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.4.dev1',
+                version: 'v0.0.4.dev2',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
@@ -1627,7 +1629,84 @@ const AppPWA = (() => {
 
 
 /* ============================================
-   MODULE 15: App
+   MODULE 15: WakeLockModule
+   Screen Wake Lock API - Prevent sleep during timer
+   ============================================ */
+const WakeLockModule = (() => {
+    let wakeLock = null;
+    let isSupported = 'wakeLock' in navigator;
+
+    const isAvailable = () => isSupported;
+
+    const request = async () => {
+        if (!isSupported) {
+            console.log('[WakeLock] API not supported in this browser');
+            return false;
+        }
+
+        try {
+            // Release any existing lock first
+            if (wakeLock) {
+                await release();
+            }
+
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log('[WakeLock] Screen lock acquired');
+
+            // Listen for release events (e.g., when user switches tabs)
+            wakeLock.addEventListener('release', () => {
+                console.log('[WakeLock] Screen lock released');
+                wakeLock = null;
+            });
+
+            return true;
+        } catch (error) {
+            console.error('[WakeLock] Failed to acquire screen lock:', error.message);
+            return false;
+        }
+    };
+
+    const release = async () => {
+        if (wakeLock) {
+            try {
+                await wakeLock.release();
+                wakeLock = null;
+                console.log('[WakeLock] Screen lock manually released');
+            } catch (error) {
+                console.error('[WakeLock] Error releasing lock:', error.message);
+            }
+        }
+    };
+
+    const getState = () => ({
+        isSupported,
+        isLocked: wakeLock !== null
+    });
+
+    // Re-acquire wake lock when page becomes visible again
+    const handleVisibilityChange = async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            console.log('[WakeLock] Page visible again, re-acquiring lock');
+            await request();
+        }
+    };
+
+    // Listen for visibility changes
+    if (isSupported) {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    return {
+        isAvailable,
+        request,
+        release,
+        getState
+    };
+})();
+
+
+/* ============================================
+   MODULE 16: App
    Main application initialization & events
    ============================================ */
 const App = (() => {
@@ -1677,6 +1756,37 @@ const App = (() => {
 
         // Save timer state on visibility change (user leaves/returns to app)
         document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Handle URL query parameters for app shortcuts
+        handleUrlParams();
+    };
+
+    // Handle URL query parameters for app shortcuts
+    const handleUrlParams = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const action = urlParams.get('action');
+
+        if (action === 'focus') {
+            console.log('[App] Shortcut: Starting focus session');
+            // Set to focus mode and start timer
+            setMode('focus');
+            TimerModule.start();
+            WakeLockModule.request();
+            UIModule.updatePlayPauseButton(true);
+        } else if (action === 'addtask') {
+            console.log('[App] Shortcut: Focusing task input');
+            // Focus and scroll to task input
+            const { elements } = UIModule;
+            if (elements.taskInput) {
+                elements.taskInput.focus();
+                elements.taskInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // Clean up URL parameters to prevent re-triggering on refresh
+        if (action) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
     };
 
     // Handle restored timer state from localStorage
@@ -1771,8 +1881,11 @@ const App = (() => {
         UIModule.updateTimer(state);
     };
 
-    // Timer completion - record to ff_history + confetti
+        // Timer completion - record to ff_history + confetti
     const onTimerComplete = (mode) => {
+        // Release wake lock when timer completes
+        WakeLockModule.release();
+        
         AudioModule.playBeep();
         
         if (mode === 'focus') {
@@ -1815,8 +1928,12 @@ const App = (() => {
             const state = TimerModule.getState();
             if (state.isRunning) {
                 TimerModule.pause();
+                // Release wake lock when timer pauses
+                WakeLockModule.release();
             } else {
                 TimerModule.start();
+                // Request wake lock when timer starts (prevents screen sleep)
+                WakeLockModule.request();
             }
             UIModule.updatePlayPauseButton(TimerModule.getState().isRunning);
         });
@@ -2050,8 +2167,10 @@ const App = (() => {
                 const state = TimerModule.getState();
                 if (state.isRunning) {
                     TimerModule.pause();
+                    WakeLockModule.release();
                 } else {
                     TimerModule.start();
+                    WakeLockModule.request();
                 }
                 UIModule.updatePlayPauseButton(TimerModule.getState().isRunning);
             },
