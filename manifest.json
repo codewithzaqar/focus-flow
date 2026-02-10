@@ -2,7 +2,7 @@
   "name": "FocusFlow",
   "short_name": "FocusFlow",
   "description": "A minimalist Pomodoro timer with task management and analytics",
-  "start_url": "https://codewithzaqar.github.io/focus-flow/",
+  "start_url": "/index.html",
   "display": "standalone",
   "display_override": ["window-controls-overlay"],
   "background_color": "#0a0a0f",

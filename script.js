@@ -1,7 +1,8 @@
 /* ============================================
-   FOCUSFLOW v0.0.4 - JavaScript
+   FOCUSFLOW v0.0.5 - JavaScript
    Multi-File Architecture Build (PWA Edition)
    Advanced PWA: Shortcuts, WCO, Wake Lock, Media Session, Haptics, Badging
+   Gamification: Flow Level System (XP, Levels, Progress)
    ============================================
    
    Modular Architecture:
@@ -23,7 +24,8 @@
    16. MediaSessionModule - Media Session API (lock screen controls)
    17. HapticsModule - Vibration API (tactile feedback)
    18. BadgeModule - Badging API (app icon badges)
-   19. App - Main initialization (with URL shortcut params)
+   19. GamificationModule - XP, Levels, Flow Level system
+   20. App - Main initialization (with URL shortcut params)
    
    ============================================ */
 
@@ -39,7 +41,8 @@ const StorageModule = (() => {
         HISTORY: 'ff_history',
         SETTINGS: 'focusflow_settings_v2',
         THEME: 'focusflow_theme',
-        TIMER_STATE: 'focusflow_timer_state'
+        TIMER_STATE: 'focusflow_timer_state',
+        GAMIFICATION: 'focusflow_gamification'
     };
 
     const get = (key, fallback = null) => {
@@ -982,6 +985,11 @@ const UIModule = (() => {
         elements.updateToast = $('#updateToast');
         elements.updateToastBtn = $('#updateToastBtn');
         elements.updateToastDismiss = $('#updateToastDismiss');
+        // Gamification elements
+        elements.brandLevel = $('#brandLevel');
+        elements.xpBarFill = $('#xpBarFill');
+        elements.xpText = $('#xpText');
+        elements.xpFloatContainer = $('#xpFloatContainer');
     };
 
     const updateTimer = (state) => {
@@ -1147,6 +1155,61 @@ const UIModule = (() => {
         }
     };
 
+    // Update XP display in header
+    const updateXPDisplay = () => {
+        const state = GamificationModule.getState();
+        
+        if (elements.brandLevel) {
+            elements.brandLevel.textContent = `Lvl ${state.level}`;
+        }
+        if (elements.xpBarFill) {
+            elements.xpBarFill.style.width = `${Math.round(state.progress * 100)}%`;
+        }
+        if (elements.xpText) {
+            elements.xpText.textContent = `${state.xpInLevel} / ${state.xpNeeded} XP`;
+        }
+    };
+
+    // Spawn floating XP text animation
+    const spawnXPFloat = (amount, sourceElement) => {
+        if (!elements.xpFloatContainer) return;
+        
+        const float = document.createElement('div');
+        float.className = 'xp-float';
+        float.textContent = `+${amount} XP`;
+        
+        // Position near the source element or center of screen
+        let x = window.innerWidth / 2;
+        let y = window.innerHeight / 2;
+        
+        if (sourceElement) {
+            const rect = sourceElement.getBoundingClientRect();
+            x = rect.left + rect.width / 2;
+            y = rect.top;
+        }
+        
+        float.style.left = `${x}px`;
+        float.style.top = `${y}px`;
+        float.style.transform = 'translateX(-50%)';
+        
+        elements.xpFloatContainer.appendChild(float);
+        
+        // Clean up after animation
+        setTimeout(() => {
+            float.remove();
+        }, 1300);
+    };
+
+    // Trigger level-up shimmer on XP bar
+    const triggerLevelUp = () => {
+        if (elements.xpBarFill) {
+            elements.xpBarFill.classList.add('level-up');
+            setTimeout(() => {
+                elements.xpBarFill.classList.remove('level-up');
+            }, 900);
+        }
+    };
+
     const notify = (title, body) => {
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
@@ -1178,6 +1241,9 @@ const UIModule = (() => {
         updateThemeButtons,
         showOfflineBadge,
         showUpdateToast,
+        updateXPDisplay,
+        spawnXPFloat,
+        triggerLevelUp,
         notify,
         requestNotificationPermission
     };
@@ -1195,19 +1261,21 @@ const AppData = (() => {
         tasks: 'focusflow_tasks_v2',
         history: 'ff_history',
         settings: 'focusflow_settings_v2',
-        theme: 'focusflow_theme'
+        theme: 'focusflow_theme',
+        gamification: 'focusflow_gamification'
     };
 
     // Export all data to JSON
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.4',
+                version: 'v0.0.5',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
                 ff_settings: StorageModule.get(BACKUP_KEYS.settings, SettingsModule.DEFAULT_SETTINGS),
-                ff_theme: StorageModule.get(BACKUP_KEYS.theme, 'default')
+                ff_theme: StorageModule.get(BACKUP_KEYS.theme, 'default'),
+                ff_gamification: StorageModule.get(BACKUP_KEYS.gamification, { totalXP: 0 })
             };
 
             const jsonString = JSON.stringify(backup, null, 2);
@@ -1307,6 +1375,9 @@ const AppData = (() => {
                     }
                     if (data.ff_theme) {
                         StorageModule.set(BACKUP_KEYS.theme, data.ff_theme);
+                    }
+                    if (data.ff_gamification) {
+                        StorageModule.set(BACKUP_KEYS.gamification, data.ff_gamification);
                     }
 
                     resolve({ success: true, reloadRequired: true });
@@ -1896,7 +1967,110 @@ const BadgeModule = (() => {
 
 
 /* ============================================
-   MODULE 19: App
+   MODULE 19: GamificationModule
+   XP, Levels, Flow Level system
+   Rule: 1 min focus = 10 XP, 1 completed task = 50 XP
+   ============================================ */
+const GamificationModule = (() => {
+    // Level thresholds: Level N requires LEVELS[N-1] total XP to reach
+    // Level 1: 0 XP, Level 2: 500 XP, Level 3: 1500 XP, Level 4: 3000 XP, ...
+    const LEVELS = [0, 500, 1500, 3000, 5000, 8000, 12000, 17000, 23000, 30000];
+
+    const XP_PER_MINUTE = 10;
+    const XP_PER_TASK = 50;
+
+    let state = { totalXP: 0 };
+
+    const init = () => {
+        const saved = StorageModule.get(StorageModule.KEYS.GAMIFICATION, { totalXP: 0 });
+        state.totalXP = saved.totalXP || 0;
+    };
+
+    const save = () => {
+        StorageModule.set(StorageModule.KEYS.GAMIFICATION, state);
+    };
+
+    const getLevel = () => {
+        for (let i = LEVELS.length - 1; i >= 0; i--) {
+            if (state.totalXP >= LEVELS[i]) {
+                return i + 1;
+            }
+        }
+        return 1;
+    };
+
+    // Get XP thresholds for current level
+    const getLevelBounds = () => {
+        const level = getLevel();
+        const currentThreshold = LEVELS[level - 1] || 0;
+        const nextThreshold = LEVELS[level] || (currentThreshold + 5000);
+        return { current: currentThreshold, next: nextThreshold, level };
+    };
+
+    // Get progress within current level (0-1)
+    const getLevelProgress = () => {
+        const bounds = getLevelBounds();
+        const xpInLevel = state.totalXP - bounds.current;
+        const xpNeeded = bounds.next - bounds.current;
+        return xpNeeded > 0 ? Math.min(1, xpInLevel / xpNeeded) : 1;
+    };
+
+    // Award XP and return { awarded, newLevel, leveledUp }
+    const awardXP = (amount) => {
+        const oldLevel = getLevel();
+        state.totalXP += amount;
+        save();
+        const newLevel = getLevel();
+        return {
+            awarded: amount,
+            totalXP: state.totalXP,
+            newLevel,
+            leveledUp: newLevel > oldLevel
+        };
+    };
+
+    // Award XP for focus minutes
+    const awardFocusXP = (minutes) => {
+        if (minutes <= 0) return null;
+        return awardXP(minutes * XP_PER_MINUTE);
+    };
+
+    // Award XP for task completion
+    const awardTaskXP = () => {
+        return awardXP(XP_PER_TASK);
+    };
+
+    const getTotalXP = () => state.totalXP;
+
+    const getState = () => {
+        const bounds = getLevelBounds();
+        return {
+            totalXP: state.totalXP,
+            level: bounds.level,
+            progress: getLevelProgress(),
+            currentThreshold: bounds.current,
+            nextThreshold: bounds.next,
+            xpInLevel: state.totalXP - bounds.current,
+            xpNeeded: bounds.next - bounds.current
+        };
+    };
+
+    // Reset XP (for clear history)
+    const reset = () => {
+        state.totalXP = 0;
+        save();
+    };
+
+    return {
+        init, awardFocusXP, awardTaskXP, getTotalXP,
+        getLevel, getLevelProgress, getLevelBounds, getState, reset,
+        XP_PER_MINUTE, XP_PER_TASK
+    };
+})();
+
+
+/* ============================================
+   MODULE 20: App
    Main application initialization & events
    ============================================ */
 const App = (() => {
@@ -1907,6 +2081,7 @@ const App = (() => {
         UIModule.cache();
         TaskModule.init();
         ChartModule.init('focusChart');
+        GamificationModule.init();
         
         // Initialize theme
         const currentTheme = ThemeModule.init();
@@ -1929,6 +2104,9 @@ const App = (() => {
         }
 
         UIModule.renderTasks();
+
+        // Initialize XP display
+        UIModule.updateXPDisplay();
 
         // Initialize volume display
         const initialVolume = AudioModule.getVolume() * 100;
@@ -1992,10 +2170,17 @@ const App = (() => {
                     activeTask?.name || null
                 );
                 
+                // Award XP for the completed session
+                const xpResult = GamificationModule.awardFocusXP(duration);
+                UIModule.updateXPDisplay();
+                if (xpResult?.leveledUp) {
+                    UIModule.triggerLevelUp();
+                }
+                
                 // Show notification
                 UIModule.notify(
                     'Focus Session Complete!',
-                    `Great work! You focused for ${duration} minutes while away.`
+                    `Great work! You focused for ${duration} minutes while away. +${xpResult?.awarded || 0} XP`
                 );
                 
                 // Launch confetti
@@ -2090,12 +2275,22 @@ const App = (() => {
                 activeTask?.name || null
             );
             
+            // Award XP for focus minutes
+            const xpResult = GamificationModule.awardFocusXP(duration);
+            if (xpResult) {
+                UIModule.spawnXPFloat(xpResult.awarded, UIModule.elements.timer);
+                UIModule.updateXPDisplay();
+                if (xpResult.leveledUp) {
+                    UIModule.triggerLevelUp();
+                }
+            }
+            
             // Launch confetti celebration
             ConfettiModule.launch();
             
             UIModule.notify(
                 'Focus Session Complete!',
-                `Great work! You focused for ${duration} minutes.`
+                `Great work! You focused for ${duration} minutes. +${xpResult?.awarded || 0} XP`
             );
             
             // Auto advance to break
@@ -2201,6 +2396,15 @@ const App = (() => {
                 // Trigger haptic feedback when completing a task
                 if (task && task.completed) {
                     HapticsModule.taskComplete();
+                    // Award XP for task completion
+                    const xpResult = GamificationModule.awardTaskXP();
+                    if (xpResult) {
+                        UIModule.spawnXPFloat(xpResult.awarded, taskItem);
+                        UIModule.updateXPDisplay();
+                        if (xpResult.leveledUp) {
+                            UIModule.triggerLevelUp();
+                        }
+                    }
                 }
                 // Update badge after task completion
                 BadgeModule.updateFromState();
@@ -2293,9 +2497,11 @@ const App = (() => {
 
         // Clear history with confirmation
         elements.clearHistoryBtn?.addEventListener('click', () => {
-            if (confirm('Clear all focus history? This action cannot be undone.')) {
+            if (confirm('Clear all focus history and XP progress? This action cannot be undone.')) {
                 HistoryModule.clearHistory();
+                GamificationModule.reset();
                 UIModule.updateStatsDisplay();
+                UIModule.updateXPDisplay();
                 UIModule.toggleSettings(false);
                 // Update badge after clearing history
                 BadgeModule.updateFromState();

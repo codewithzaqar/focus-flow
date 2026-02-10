@@ -19,7 +19,16 @@
                 <div class="brand-icon">
                     <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 </div>
-                <span class="brand-name">FocusFlow</span>
+                <div class="brand-profile">
+                    <div class="brand-top-row">
+                        <span class="brand-name">FocusFlow</span>
+                        <span class="brand-level" id="brandLevel">Lvl 1</span>
+                    </div>
+                    <div class="xp-bar">
+                        <div class="xp-bar-fill" id="xpBarFill" style="width: 0%"></div>
+                    </div>
+                    <div class="xp-text" id="xpText">0 / 500 XP</div>
+                </div>
             </div>
             <!-- Offline Badge -->
             <div class="offline-badge" id="offlineBadge">
@@ -189,7 +198,7 @@
             <div class="settings-section">
                 <div class="settings-label">About</div>
                 <div class="version-info">
-                    <strong>FocusFlow</strong> v0.0.4
+                    <strong>FocusFlow</strong> v0.0.5
                 </div>
                 <button class="install-app-btn" id="installAppBtn" style="display: none;">
                     <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -265,6 +274,9 @@
             </div>
         </div>
     </div>
+
+    <!-- XP Float Container -->
+    <div class="xp-float-container" id="xpFloatContainer"></div>
 
     <!-- Confetti Container -->
     <div class="confetti-container" id="confettiContainer"></div>
