@@ -1485,6 +1485,35 @@ const UIModule = (() => {
         }).join('');
     };
 
+    // Show rate limit toast
+    const showRateLimitToast = () => {
+        // Create toast element if it doesn't exist
+        let toast = document.getElementById('rateLimitToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'rateLimitToast';
+            toast.className = 'rate-limit-toast';
+            toast.innerHTML = `
+                <div class="rate-limit-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div class="rate-limit-content">
+                    <span class="rate-limit-title">Task Completed</span>
+                    <span class="rate-limit-message">XP rate limit: Max 5 tasks/hour</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+        }
+
+        // Show toast
+        toast.classList.add('visible');
+
+        // Hide after 3 seconds
+        setTimeout(() => {
+            toast.classList.remove('visible');
+        }, 3000);
+    };
+
     // Show achievement unlock toast
     const showAchievementToast = (badgeName) => {
         // Create toast element if it doesn't exist
@@ -1546,6 +1575,7 @@ const UIModule = (() => {
         toggleAchievements,
         renderAchievements,
         showAchievementToast,
+        showRateLimitToast,
         updateStatsDisplay,
         updateAudioToggle,
         updateVolumeDisplay,
@@ -2313,25 +2343,69 @@ const BadgeModule = (() => {
    MODULE 19: GamificationModule
    XP, Levels, Flow Level system
    Rule: 1 min focus = 10 XP, 1 completed task = 50 XP
+   Anti-cheat: Max 5 task completions per hour
    ============================================ */
 const GamificationModule = (() => {
     // Level thresholds: Level N requires LEVELS[N-1] total XP to reach
-    // Level 1: 0 XP, Level 2: 500 XP, Level 3: 1500 XP, Level 4: 3000 XP, ...
-    const LEVELS = [0, 500, 1500, 3000, 5000, 8000, 12000, 17000, 23000, 30000];
+    // Exponential curve: Level 1=0, L2=500, L3=1250 (500*2.5), L4=2500 (1250*2), etc.
+    const LEVELS = [0, 500, 1250, 2500, 4750, 8750, 15750, 27750, 47750, 79750];
 
     const XP_PER_MINUTE = 10;
     const XP_PER_TASK = 50;
+    const MAX_TASK_XP_PER_HOUR = 5; // Anti-cheat: max 5 tasks per hour
 
     let state = { totalXP: 0, tasksCompleted: 0 };
+    let xpTodayState = {
+        taskCompletions: [], // Array of timestamps when tasks were completed for XP
+        lastResetDate: null
+    };
 
     const init = () => {
         const saved = StorageModule.get(StorageModule.KEYS.GAMIFICATION, { totalXP: 0, tasksCompleted: 0 });
         state.totalXP = saved.totalXP || 0;
         state.tasksCompleted = saved.tasksCompleted || 0;
+        
+        // Load xpToday state for anti-cheat
+        const savedXpToday = StorageModule.get('focusflow_xp_today', {
+            taskCompletions: [],
+            lastResetDate: null
+        });
+        xpTodayState = {
+            taskCompletions: Array.isArray(savedXpToday.taskCompletions) ? savedXpToday.taskCompletions : [],
+            lastResetDate: savedXpToday.lastResetDate || null
+        };
+        
+        // Clean up old entries (older than 1 hour)
+        cleanupOldTaskCompletions();
     };
 
     const save = () => {
         StorageModule.set(StorageModule.KEYS.GAMIFICATION, state);
+        StorageModule.set('focusflow_xp_today', xpTodayState);
+    };
+
+    // Anti-cheat: Remove task completion timestamps older than 1 hour
+    const cleanupOldTaskCompletions = () => {
+        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+        const beforeCount = xpTodayState.taskCompletions.length;
+        xpTodayState.taskCompletions = xpTodayState.taskCompletions.filter(ts => ts > oneHourAgo);
+        
+        // Save if we removed any entries
+        if (xpTodayState.taskCompletions.length !== beforeCount) {
+            save();
+        }
+    };
+
+    // Anti-cheat: Check if user can earn XP for task completion
+    const canEarnTaskXP = () => {
+        cleanupOldTaskCompletions();
+        return xpTodayState.taskCompletions.length < MAX_TASK_XP_PER_HOUR;
+    };
+
+    // Anti-cheat: Get remaining task XP slots this hour
+    const getRemainingTaskXPSlots = () => {
+        cleanupOldTaskCompletions();
+        return Math.max(0, MAX_TASK_XP_PER_HOUR - xpTodayState.taskCompletions.length);
     };
 
     const getTasksCompleted = () => state.tasksCompleted;
@@ -2349,7 +2423,7 @@ const GamificationModule = (() => {
     const getLevelBounds = () => {
         const level = getLevel();
         const currentThreshold = LEVELS[level - 1] || 0;
-        const nextThreshold = LEVELS[level] || (currentThreshold + 5000);
+        const nextThreshold = LEVELS[level] || (currentThreshold + 50000);
         return { current: currentThreshold, next: nextThreshold, level };
     };
 
@@ -2367,12 +2441,19 @@ const GamificationModule = (() => {
         state.totalXP += amount;
         save();
         const newLevel = getLevel();
-        return {
+        const result = {
             awarded: amount,
             totalXP: state.totalXP,
             newLevel,
             leveledUp: newLevel > oldLevel
         };
+        
+        // Launch confetti on level up
+        if (result.leveledUp) {
+            ConfettiModule.launch();
+        }
+        
+        return result;
     };
 
     // Award XP for focus minutes
@@ -2381,11 +2462,28 @@ const GamificationModule = (() => {
         return awardXP(minutes * XP_PER_MINUTE);
     };
 
-    // Award XP for task completion
+    // Award XP for task completion (with anti-cheat rate limiting)
     const awardTaskXP = () => {
+        // Anti-cheat: Check rate limit
+        if (!canEarnTaskXP()) {
+            return {
+                awarded: 0,
+                totalXP: state.totalXP,
+                newLevel: getLevel(),
+                leveledUp: false,
+                rateLimited: true,
+                remainingSlots: 0
+            };
+        }
+        
+        // Record this task completion for rate limiting
+        xpTodayState.taskCompletions.push(Date.now());
+        
         state.tasksCompleted += 1;
         save();
-        return awardXP(XP_PER_TASK);
+        const result = awardXP(XP_PER_TASK);
+        result.remainingSlots = getRemainingTaskXPSlots();
+        return result;
     };
 
     const getTotalXP = () => state.totalXP;
@@ -2407,13 +2505,18 @@ const GamificationModule = (() => {
     const reset = () => {
         state.totalXP = 0;
         state.tasksCompleted = 0;
+        xpTodayState = {
+            taskCompletions: [],
+            lastResetDate: null
+        };
         save();
     };
 
     return {
         init, awardFocusXP, awardTaskXP, getTotalXP, getTasksCompleted,
         getLevel, getLevelProgress, getLevelBounds, getState, reset,
-        XP_PER_MINUTE, XP_PER_TASK
+        canEarnTaskXP, getRemainingTaskXPSlots,
+        XP_PER_MINUTE, XP_PER_TASK, MAX_TASK_XP_PER_HOUR
     };
 })();
 
@@ -3179,15 +3282,23 @@ const App = (() => {
                     HapticsModule.taskComplete();
                     // Play SFX for task completion
                     SFXModule.playIfEnabled(AudioModule.playBeep);
-                    // Award XP for task completion
+                    // Award XP for task completion (with anti-cheat rate limiting)
                     const xpResult = GamificationModule.awardTaskXP();
                     if (xpResult) {
-                        UIModule.spawnXPFloat(xpResult.awarded, taskItem);
-                        UIModule.updateXPDisplay();
-                        if (xpResult.leveledUp) {
-                            UIModule.showLevelUpAnimation(xpResult.newLevel);
-                            UIModule.triggerLevelUp();
-                            AchievementModule.checkSpecific('MARATHONER');
+                        // Show different feedback based on rate limit status
+                        if (xpResult.rateLimited) {
+                            // Task completed but XP rate limited
+                            UIModule.spawnXPFloat('Task Done!', taskItem);
+                            UIModule.showRateLimitToast();
+                        } else {
+                            // Normal XP award
+                            UIModule.spawnXPFloat(xpResult.awarded > 0 ? `+${xpResult.awarded} XP` : 'Task Done!', taskItem);
+                            UIModule.updateXPDisplay();
+                            if (xpResult.leveledUp) {
+                                UIModule.showLevelUpAnimation(xpResult.newLevel);
+                                UIModule.triggerLevelUp();
+                                AchievementModule.checkSpecific('MARATHONER');
+                            }
                         }
                     }
                     // Check Task Master achievement
