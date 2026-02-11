@@ -185,7 +185,7 @@
             <div class="settings-section">
                 <div class="settings-label">Audio</div>
                 <div class="settings-row">
-                    <span class="settings-row-label">Focus Noise</span>
+                    <span class="settings-row-label">Focus Noise (Brown Noise)</span>
                     <div class="toggle-switch" id="audioToggle" role="switch" aria-checked="false" tabindex="0"></div>
                 </div>
                 <div class="volume-row" id="volumeRow">
@@ -193,6 +193,11 @@
                     <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="20">
                     <span class="volume-value" id="volumeValue">20%</span>
                 </div>
+                <div class="settings-row">
+                    <span class="settings-row-label">Sound Effects (SFX)</span>
+                    <div class="toggle-switch" id="sfxToggle" role="switch" aria-checked="true" tabindex="0"></div>
+                </div>
+                <p class="settings-hint">SFX includes: Level Up, Achievements, Daily Goal, Timer Complete</p>
             </div>
 
             <div class="settings-section">
@@ -214,7 +219,7 @@
             <div class="settings-section">
                 <div class="settings-label">About</div>
                 <div class="version-info">
-                    <strong>FocusFlow</strong> v0.0.5.dev2
+                    <strong>FocusFlow</strong> v0.0.5.dev3
                 </div>
                 <button class="install-app-btn" id="installAppBtn" style="display: none;">
                     <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -276,27 +281,56 @@
         <div class="stats-panel">
             <div class="stats-handle"></div>
             <div class="stats-header">
-                <h2 class="stats-title">Focus Analytics</h2>
+                <h2 class="stats-title">Flow Profile</h2>
                 <button class="stats-close" id="statsClose" aria-label="Close">&times;</button>
             </div>
 
-            <div class="stats-grid">
-                <div class="stat-card glass">
-                    <div class="stat-value" id="statTotalMinutes">0</div>
-                    <div class="stat-label">Total Minutes</div>
+            <!-- RPG-Style Flow Profile Card -->
+            <div class="flow-profile-card glass">
+                <div class="profile-header">
+                    <div class="profile-avatar">
+                        <span class="profile-level-badge" id="profileLevelBadge">1</span>
+                    </div>
+                    <div class="profile-info">
+                        <h3 class="profile-title">Flow Master</h3>
+                        <div class="profile-xp-bar">
+                            <div class="profile-xp-fill" id="profileXpFill" style="width: 0%"></div>
+                        </div>
+                        <p class="profile-xp-text" id="profileXpText">0 / 500 XP to next level</p>
+                    </div>
                 </div>
-                <div class="stat-card glass">
-                    <div class="stat-value" id="statTotalSessions">0</div>
-                    <div class="stat-label">Sessions</div>
+                
+                <div class="profile-stats-grid">
+                    <div class="profile-stat">
+                        <span class="profile-stat-icon">⏱️</span>
+                        <span class="profile-stat-value" id="profileFocusHours">0</span>
+                        <span class="profile-stat-label">Hours Focused</span>
+                    </div>
+                    <div class="profile-stat">
+                        <span class="profile-stat-icon">✅</span>
+                        <span class="profile-stat-value" id="profileTasksCrushed">0</span>
+                        <span class="profile-stat-label">Tasks Crushed</span>
+                    </div>
+                    <div class="profile-stat">
+                        <span class="profile-stat-icon">🔥</span>
+                        <span class="profile-stat-value" id="profileStreak">0</span>
+                        <span class="profile-stat-label">Day Streak</span>
+                    </div>
+                    <div class="profile-stat">
+                        <span class="profile-stat-icon">🏆</span>
+                        <span class="profile-stat-value" id="profileBadges">0</span>
+                        <span class="profile-stat-label">Badges</span>
+                    </div>
                 </div>
-                <div class="stat-card glass">
-                    <div class="stat-value" id="statAvgSession">0</div>
-                    <div class="stat-label">Avg (min)</div>
-                </div>
-                <div class="stat-card glass">
-                    <div class="stat-value" id="statStreak">0</div>
-                    <div class="stat-label">Day Streak</div>
-                </div>
+
+                <button class="share-progress-btn" id="shareProgressBtn">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                        <polyline points="16 6 12 2 8 6"/>
+                        <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                    Share Progress
+                </button>
             </div>
 
             <!-- Daily Goal Widget -->
@@ -355,6 +389,11 @@
         <span class="update-toast-message">New version available</span>
         <button class="update-toast-btn" id="updateToastBtn">Reload</button>
         <button class="update-toast-dismiss" id="updateToastDismiss" aria-label="Dismiss">&times;</button>
+    </div>
+
+    <!-- Clipboard Toast Notification -->
+    <div class="clipboard-toast" id="clipboardToast">
+        <span class="clipboard-toast-message">Copied to clipboard!</span>
     </div>
 
     <!-- JavaScript -->

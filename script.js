@@ -1,8 +1,8 @@
 /* ============================================
-   FOCUSFLOW v0.0.5.dev2 - JavaScript
+   FOCUSFLOW v0.0.5.dev3 - JavaScript
    Multi-File Architecture Build (PWA Edition)
    Advanced PWA: Shortcuts, WCO, Wake Lock, Media Session, Haptics, Badging
-   Gamification: Flow Level System (XP, Levels, Progress, Achievements, Streaks, Daily Goals)
+   Gamification: Flow Level System (XP, Levels, Progress, Achievements, Streaks, Daily Goals, RPG Profile)
    ============================================
    
    Modular Architecture:
@@ -11,24 +11,25 @@
    3. TaskModule - Task queue CRUD operations
    4. TimerModule - Pomodoro timer logic (with Date.now precision + persistence)
    5. AudioModule - Web Audio API brown noise (lazy init)
-   6. ChartModule - Canvas API bar chart
-   7. ConfettiModule - Celebration effect
-   8. SettingsModule - User preferences (with custom duration + theme)
-   9. ThemeModule - Theme switching (Default/Midnight/Forest)
-   10. UIModule - DOM interactions
-   11. AppData - Data backup/restore (JSON Export/Import)
-   12. AppInput - Keyboard shortcut handler
-   13. AppNetwork - Online/Offline detection
-   14. App.PWA - Service Worker registration, install prompt, & update detection
-   15. WakeLockModule - Screen Wake Lock API (prevent sleep during timer)
-   16. MediaSessionModule - Media Session API (lock screen controls)
-   17. HapticsModule - Vibration API (tactile feedback)
-   18. BadgeModule - Badging API (app icon badges)
-   19. GamificationModule - XP, Levels, Flow Level system
-   20. AchievementModule - Badge/Achievement system
-   21. StreakModule - Daily streak tracking
-   22. DailyGoalModule - Daily goal (4 sessions) with bonus XP
-   23. App - Main initialization (with URL shortcut params)
+   6. SFXModule - Sound Effects toggle management
+   7. ChartModule - Canvas API bar chart
+   8. ConfettiModule - Celebration effect
+   9. SettingsModule - User preferences (with custom duration + theme)
+   10. ThemeModule - Theme switching (Default/Midnight/Forest)
+   11. UIModule - DOM interactions
+   12. AppData - Data backup/restore (JSON Export/Import)
+   13. AppInput - Keyboard shortcut handler
+   14. AppNetwork - Online/Offline detection
+   15. App.PWA - Service Worker registration, install prompt, & update detection
+   16. WakeLockModule - Screen Wake Lock API (prevent sleep during timer)
+   17. MediaSessionModule - Media Session API (lock screen controls)
+   18. HapticsModule - Vibration API (tactile feedback)
+   19. BadgeModule - Badging API (app icon badges)
+   20. GamificationModule - XP, Levels, Flow Level system
+   21. AchievementModule - Badge/Achievement system
+   22. StreakModule - Daily streak tracking
+   23. DailyGoalModule - Daily goal (4 sessions) with bonus XP
+   24. App - Main initialization (with URL shortcut params)
    
    ============================================ */
 
@@ -46,7 +47,8 @@ const StorageModule = (() => {
         THEME: 'focusflow_theme',
         TIMER_STATE: 'focusflow_timer_state',
         GAMIFICATION: 'focusflow_gamification',
-        ACHIEVEMENTS: 'ff_achievements'
+        ACHIEVEMENTS: 'ff_achievements',
+        SFX_ENABLED: 'focusflow_sfx_enabled'
     };
 
     const get = (key, fallback = null) => {
@@ -666,7 +668,54 @@ const AudioModule = (() => {
 
 
 /* ============================================
-   MODULE 6: ChartModule
+   MODULE 6: SFXModule
+   Sound Effects Management
+   Controls SFX toggle state and respects user preference
+   ============================================ */
+const SFXModule = (() => {
+    let sfxEnabled = true;
+
+    const init = () => {
+        const saved = StorageModule.get(StorageModule.KEYS.SFX_ENABLED, true);
+        sfxEnabled = saved !== false; // Default to true if not set
+    };
+
+    const save = () => {
+        StorageModule.set(StorageModule.KEYS.SFX_ENABLED, sfxEnabled);
+    };
+
+    const isEnabled = () => sfxEnabled;
+
+    const setEnabled = (enabled) => {
+        sfxEnabled = enabled;
+        save();
+    };
+
+    const toggle = () => {
+        sfxEnabled = !sfxEnabled;
+        save();
+        return sfxEnabled;
+    };
+
+    // Play sound only if SFX is enabled
+    const playIfEnabled = (soundFunction) => {
+        if (sfxEnabled && soundFunction) {
+            soundFunction();
+        }
+    };
+
+    return {
+        init,
+        isEnabled,
+        setEnabled,
+        toggle,
+        playIfEnabled
+    };
+})();
+
+
+/* ============================================
+   MODULE 8: ChartModule
    HTML5 Canvas Bar Chart
    ============================================ */
 const ChartModule = (() => {
@@ -787,8 +836,8 @@ const ChartModule = (() => {
 
 
 /* ============================================
-   MODULE 7: ConfettiModule
-   Lightweight celebration effect
+   MODULE 8: ChartModule
+   HTML5 Canvas Bar Chart
    ============================================ */
 const ConfettiModule = (() => {
     const colors = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#3b82f6'];
@@ -834,7 +883,7 @@ const ConfettiModule = (() => {
 
 
 /* ============================================
-   MODULE 8: SettingsModule
+   MODULE 9: SettingsModule
    User preferences management
    Now supports custom focus duration
    ============================================ */
@@ -1009,6 +1058,20 @@ const UIModule = (() => {
         // Daily Goal elements
         elements.dailyGoalProgress = $('#dailyGoalProgress');
         elements.dailyGoalCount = $('#dailyGoalCount');
+        // Flow Profile Card elements
+        elements.profileLevelBadge = $('#profileLevelBadge');
+        elements.profileTitle = $('#profileTitle');
+        elements.profileXpFill = $('#profileXpFill');
+        elements.profileXpText = $('#profileXpText');
+        elements.profileFocusHours = $('#profileFocusHours');
+        elements.profileTasksCrushed = $('#profileTasksCrushed');
+        elements.profileStreak = $('#profileStreak');
+        elements.profileBadges = $('#profileBadges');
+        elements.shareProgressBtn = $('#shareProgressBtn');
+        // SFX Toggle
+        elements.sfxToggle = $('#sfxToggle');
+        // Clipboard Toast
+        elements.clipboardToast = $('#clipboardToast');
     };
 
     const updateTimer = (state) => {
@@ -1244,8 +1307,8 @@ const UIModule = (() => {
         // Show the overlay
         elements.levelupOverlay.classList.add('visible');
         
-        // Play success sound
-        AudioModule.playBeep();
+        // Play success sound only if SFX enabled
+        SFXModule.playIfEnabled(AudioModule.playBeep);
         
         // Auto-hide after 3 seconds
         setTimeout(() => {
@@ -1270,15 +1333,15 @@ const UIModule = (() => {
     // Update daily goal widget display
     const updateDailyGoalDisplay = (progress) => {
         if (!elements.dailyGoalProgress || !elements.dailyGoalCount) return;
-        
+
         // Update count
         elements.dailyGoalCount.textContent = progress.sessionsToday;
-        
+
         // Update progress ring
         const circumference = 2 * Math.PI * 42; // r=42
         const offset = circumference * (1 - progress.progress);
         elements.dailyGoalProgress.style.strokeDashoffset = offset;
-        
+
         // Add completed class if goal reached
         const goalSection = document.querySelector('.daily-goal-section');
         if (goalSection) {
@@ -1287,13 +1350,103 @@ const UIModule = (() => {
             } else {
                 goalSection.classList.remove('completed');
             }
-            
+
             // Add animation class if just reached
             if (progress.goalJustReached) {
                 goalSection.classList.add('goal-reached');
                 setTimeout(() => {
                     goalSection.classList.remove('goal-reached');
                 }, 600);
+            }
+        }
+    };
+
+    // Update Flow Profile Card display
+    const updateFlowProfileDisplay = () => {
+        const gamification = GamificationModule.getState();
+        const history = HistoryModule.getStats();
+        const tasks = TaskModule.getAll();
+        const streak = StreakModule.getStreak();
+        const badges = AchievementModule.getUnlockedCount();
+
+        // Calculate hours from minutes
+        const hours = Math.floor(history.totalMinutes / 60);
+        const tasksCompleted = tasks.filter(t => t.completed).length;
+
+        // Update level badge
+        if (elements.profileLevelBadge) {
+            elements.profileLevelBadge.textContent = gamification.level;
+        }
+
+        // Update XP bar
+        if (elements.profileXpFill) {
+            elements.profileXpFill.style.width = `${Math.round(gamification.progress * 100)}%`;
+        }
+
+        // Update XP text
+        if (elements.profileXpText) {
+            elements.profileXpText.textContent = `${gamification.xpInLevel} / ${gamification.xpNeeded} XP to next level`;
+        }
+
+        // Update stats
+        if (elements.profileFocusHours) {
+            elements.profileFocusHours.textContent = hours;
+        }
+        if (elements.profileTasksCrushed) {
+            elements.profileTasksCrushed.textContent = tasksCompleted;
+        }
+        if (elements.profileStreak) {
+            elements.profileStreak.textContent = streak;
+        }
+        if (elements.profileBadges) {
+            elements.profileBadges.textContent = badges;
+        }
+    };
+
+    // Update SFX toggle UI
+    const updateSFXToggle = (enabled) => {
+        if (elements.sfxToggle) {
+            elements.sfxToggle.classList.toggle('active', enabled);
+            elements.sfxToggle.setAttribute('aria-checked', enabled);
+        }
+    };
+
+    // Show clipboard toast notification
+    const showClipboardToast = () => {
+        if (!elements.clipboardToast) return;
+
+        elements.clipboardToast.classList.add('visible');
+
+        setTimeout(() => {
+            elements.clipboardToast.classList.remove('visible');
+        }, 2000);
+    };
+
+    // Share progress to clipboard
+    const shareProgress = async () => {
+        try {
+            const gamification = GamificationModule.getState();
+            const streak = StreakModule.getStreak();
+            const badges = AchievementModule.getUnlockedCount();
+
+            const shareText = `I'm Level ${gamification.level} on FocusFlow! 🔥 ${streak} Day Streak | 🏆 ${badges} Badge${badges !== 1 ? 's' : ''} Unlocked. #FocusFlow`;
+
+            await navigator.clipboard.writeText(shareText);
+            showClipboardToast();
+        } catch (error) {
+            // Fallback: try to use document.execCommand
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = shareText;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showClipboardToast();
+            } catch (e) {
+                // Clipboard failed, ignore
             }
         }
     };
@@ -1405,6 +1558,10 @@ const UIModule = (() => {
         showLevelUpAnimation,
         updateStreakDisplay,
         updateDailyGoalDisplay,
+        updateFlowProfileDisplay,
+        updateSFXToggle,
+        showClipboardToast,
+        shareProgress,
         notify,
         requestNotificationPermission
     };
@@ -1427,14 +1584,15 @@ const AppData = (() => {
         gamification: 'focusflow_gamification',
         achievements: 'ff_achievements',
         streak: 'focusflow_streak',
-        daily_goal: 'focusflow_daily_goal'
+        daily_goal: 'focusflow_daily_goal',
+        sfx_enabled: 'focusflow_sfx_enabled'
     };
 
     // Export all data to JSON
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.5.dev2',
+                version: 'v0.0.5.dev3',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
@@ -1444,7 +1602,8 @@ const AppData = (() => {
                 ff_gamification: StorageModule.get(BACKUP_KEYS.gamification, { totalXP: 0 }),
                 ff_achievements: StorageModule.get(BACKUP_KEYS.achievements, []),
                 ff_streak: StorageModule.get(BACKUP_KEYS.streak, { streak: 0, lastFocusDate: null }),
-                ff_daily_goal: StorageModule.get(BACKUP_KEYS.daily_goal, { sessionsToday: 0, lastResetDate: null, goalReachedToday: false })
+                ff_daily_goal: StorageModule.get(BACKUP_KEYS.daily_goal, { sessionsToday: 0, lastResetDate: null, goalReachedToday: false }),
+                ff_sfx_enabled: StorageModule.get(BACKUP_KEYS.sfx_enabled, true)
             };
 
             const jsonString = JSON.stringify(backup, null, 2);
@@ -1559,6 +1718,9 @@ const AppData = (() => {
                     }
                     if (data.ff_daily_goal) {
                         StorageModule.set(BACKUP_KEYS.daily_goal, data.ff_daily_goal);
+                    }
+                    if (data.ff_sfx_enabled !== undefined) {
+                        StorageModule.set(BACKUP_KEYS.sfx_enabled, data.ff_sfx_enabled);
                     }
 
                     resolve({ success: true, reloadRequired: true });
@@ -2336,8 +2498,8 @@ const AchievementModule = (() => {
         // Show notification
         UIModule.showAchievementToast(badge.name);
 
-        // Play success sound (beep)
-        AudioModule.playBeep();
+        // Play success sound (beep) - only if SFX enabled
+        SFXModule.playIfEnabled(AudioModule.playBeep);
 
         return badge;
     };
@@ -2628,7 +2790,8 @@ const App = (() => {
         AchievementModule.init();
         StreakModule.init();
         DailyGoalModule.init();
-        
+        SFXModule.init();
+
         // Initialize theme
         const currentTheme = ThemeModule.init();
         UIModule.updateThemeButtons(currentTheme);
@@ -2653,12 +2816,18 @@ const App = (() => {
 
         // Initialize XP display
         UIModule.updateXPDisplay();
-        
+
         // Initialize streak display
         UIModule.updateStreakDisplay(StreakModule.getStreak());
-        
+
         // Initialize daily goal display
         UIModule.updateDailyGoalDisplay(DailyGoalModule.getProgress());
+
+        // Initialize Flow Profile display
+        UIModule.updateFlowProfileDisplay();
+
+        // Initialize SFX toggle
+        UIModule.updateSFXToggle(SFXModule.isEnabled());
 
         // Initialize volume display
         const initialVolume = AudioModule.getVolume() * 100;
@@ -2748,10 +2917,10 @@ const App = (() => {
                         UIModule.showLevelUpAnimation(bonusResult.newLevel);
                         UIModule.triggerLevelUp();
                     }
-                    AudioModule.playBeep(); // Play success sound for goal
-                }
-                
-                // Check session-based achievements
+                    SFXModule.playIfEnabled(AudioModule.playBeep); // Play success sound for goal
+            }
+            
+            // Check session-based achievements
                 AchievementModule.checkSpecific('NOVICE_FLOW');
                 AchievementModule.checkSpecific('NIGHT_OWL');
                 
@@ -2763,12 +2932,12 @@ const App = (() => {
                 
                 // Launch confetti
                 ConfettiModule.launch();
-                AudioModule.playBeep();
+                SFXModule.playIfEnabled(AudioModule.playBeep);
             }
-            
+
             // Auto advance to next mode
             const todayStats = HistoryModule.getTodayStats();
-            const nextMode = restored.mode === 'focus' 
+            const nextMode = restored.mode === 'focus'
                 ? (todayStats.sessions % 4 === 0 ? 'long' : 'short')
                 : 'focus';
             setMode(nextMode);
@@ -2840,7 +3009,8 @@ const App = (() => {
         // Clear badge when timer completes
         BadgeModule.clear();
         
-        AudioModule.playBeep();
+        // Play completion sound only if SFX enabled
+        SFXModule.playIfEnabled(AudioModule.playBeep);
         
         if (mode === 'focus') {
             const activeTask = TaskModule.getActive();
@@ -2883,18 +3053,16 @@ const App = (() => {
                     UIModule.showLevelUpAnimation(bonusResult.newLevel);
                     UIModule.triggerLevelUp();
                 }
-                AudioModule.playBeep(); // Play success sound for goal
-            }
-            
-            // Check session-based achievements
-            AchievementModule.checkSpecific('NOVICE_FLOW');
-            AchievementModule.checkSpecific('NIGHT_OWL');
-            
-            // Launch confetti celebration
-            ConfettiModule.launch();
-            
-            UIModule.notify(
-                'Focus Session Complete!',
+                    SFXModule.playIfEnabled(AudioModule.playBeep); // Play success sound for goal
+                }
+
+                // Check session-based achievements
+                AchievementModule.checkSpecific('NOVICE_FLOW');
+                AchievementModule.checkSpecific('NIGHT_OWL');
+
+                // Show notification
+                UIModule.notify(
+                    'Focus Session Complete!',
                 `Great work! You focused for ${duration} minutes. +${xpResult?.awarded || 0} XP`
             );
             
@@ -3101,6 +3269,20 @@ const App = (() => {
             }
         });
 
+        // SFX toggle
+        elements.sfxToggle?.addEventListener('click', () => {
+            const enabled = SFXModule.toggle();
+            UIModule.updateSFXToggle(enabled);
+        });
+
+        elements.sfxToggle?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                const enabled = SFXModule.toggle();
+                UIModule.updateSFXToggle(enabled);
+            }
+        });
+
         // Volume slider
         elements.volumeSlider?.addEventListener('input', (e) => {
             const value = parseInt(e.target.value, 10);
@@ -3187,6 +3369,8 @@ const App = (() => {
         // Stats panel
         elements.statsBtn?.addEventListener('click', () => {
             UIModule.toggleStats(true);
+            // Update Flow Profile when opening stats
+            UIModule.updateFlowProfileDisplay();
         });
 
         elements.statsClose?.addEventListener('click', () => {
@@ -3197,6 +3381,11 @@ const App = (() => {
             if (e.target === elements.statsOverlay) {
                 UIModule.toggleStats(false);
             }
+        });
+
+        // Share Progress button
+        elements.shareProgressBtn?.addEventListener('click', () => {
+            UIModule.shareProgress();
         });
 
         // Window resize for chart
