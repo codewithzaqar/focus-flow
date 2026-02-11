@@ -1365,13 +1365,13 @@ const UIModule = (() => {
     const updateFlowProfileDisplay = () => {
         const gamification = GamificationModule.getState();
         const history = HistoryModule.getStats();
-        const tasks = TaskModule.getAll();
         const streak = StreakModule.getStreak();
         const badges = AchievementModule.getUnlockedCount();
 
         // Calculate hours from minutes
         const hours = Math.floor(history.totalMinutes / 60);
-        const tasksCompleted = tasks.filter(t => t.completed).length;
+        // Use total tasks completed from gamification (persists even if tasks deleted)
+        const tasksCompleted = GamificationModule.getTasksCompleted();
 
         // Update level badge
         if (elements.profileLevelBadge) {
@@ -2322,16 +2322,19 @@ const GamificationModule = (() => {
     const XP_PER_MINUTE = 10;
     const XP_PER_TASK = 50;
 
-    let state = { totalXP: 0 };
+    let state = { totalXP: 0, tasksCompleted: 0 };
 
     const init = () => {
-        const saved = StorageModule.get(StorageModule.KEYS.GAMIFICATION, { totalXP: 0 });
+        const saved = StorageModule.get(StorageModule.KEYS.GAMIFICATION, { totalXP: 0, tasksCompleted: 0 });
         state.totalXP = saved.totalXP || 0;
+        state.tasksCompleted = saved.tasksCompleted || 0;
     };
 
     const save = () => {
         StorageModule.set(StorageModule.KEYS.GAMIFICATION, state);
     };
+
+    const getTasksCompleted = () => state.tasksCompleted;
 
     const getLevel = () => {
         for (let i = LEVELS.length - 1; i >= 0; i--) {
@@ -2380,6 +2383,8 @@ const GamificationModule = (() => {
 
     // Award XP for task completion
     const awardTaskXP = () => {
+        state.tasksCompleted += 1;
+        save();
         return awardXP(XP_PER_TASK);
     };
 
@@ -2401,11 +2406,12 @@ const GamificationModule = (() => {
     // Reset XP (for clear history)
     const reset = () => {
         state.totalXP = 0;
+        state.tasksCompleted = 0;
         save();
     };
 
     return {
-        init, awardFocusXP, awardTaskXP, getTotalXP,
+        init, awardFocusXP, awardTaskXP, getTotalXP, getTasksCompleted,
         getLevel, getLevelProgress, getLevelBounds, getState, reset,
         XP_PER_MINUTE, XP_PER_TASK
     };
@@ -3072,6 +3078,8 @@ const App = (() => {
             setMode(nextMode);
         } else {
             UIModule.notify('Break Complete!', 'Ready for another focus session?');
+            // Play SFX for break completion
+            SFXModule.playIfEnabled(AudioModule.playBeep);
             setMode('focus');
         }
         
@@ -3167,8 +3175,10 @@ const App = (() => {
             } else if (action === 'complete') {
                 const task = TaskModule.toggleComplete(taskId);
                 // Trigger haptic feedback when completing a task
-                    if (task && task.completed) {
+                if (task && task.completed) {
                     HapticsModule.taskComplete();
+                    // Play SFX for task completion
+                    SFXModule.playIfEnabled(AudioModule.playBeep);
                     // Award XP for task completion
                     const xpResult = GamificationModule.awardTaskXP();
                     if (xpResult) {
