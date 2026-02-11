@@ -23,6 +23,10 @@
                     <div class="brand-top-row">
                         <span class="brand-name">FocusFlow</span>
                         <span class="brand-level" id="brandLevel">Lvl 1</span>
+                        <span class="streak-indicator" id="streakIndicator" title="Daily streak">
+                            <span class="streak-flame">🔥</span>
+                            <span class="streak-count" id="streakCount">0</span>
+                        </span>
                     </div>
                     <div class="xp-bar">
                         <div class="xp-bar-fill" id="xpBarFill" style="width: 0%"></div>
@@ -210,7 +214,7 @@
             <div class="settings-section">
                 <div class="settings-label">About</div>
                 <div class="version-info">
-                    <strong>FocusFlow</strong> v0.0.5
+                    <strong>FocusFlow</strong> v0.0.5.dev2
                 </div>
                 <button class="install-app-btn" id="installAppBtn" style="display: none;">
                     <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -295,6 +299,29 @@
                 </div>
             </div>
 
+            <!-- Daily Goal Widget -->
+            <div class="daily-goal-section glass">
+                <h3 class="daily-goal-title">Daily Goal</h3>
+                <div class="daily-goal-widget">
+                    <div class="daily-goal-ring">
+                        <svg class="daily-goal-svg" viewBox="0 0 100 100">
+                            <circle class="daily-goal-track" cx="50" cy="50" r="42"/>
+                            <circle class="daily-goal-progress" id="dailyGoalProgress" cx="50" cy="50" r="42"
+                                    stroke-dasharray="263.89" stroke-dashoffset="263.89"/>
+                        </svg>
+                        <div class="daily-goal-content">
+                            <span class="daily-goal-count" id="dailyGoalCount">0</span>
+                            <span class="daily-goal-divider">/</span>
+                            <span class="daily-goal-total">4</span>
+                        </div>
+                    </div>
+                    <div class="daily-goal-info">
+                        <p class="daily-goal-text">Complete 4 focus sessions today</p>
+                        <p class="daily-goal-reward">Bonus: +100 XP</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="chart-section glass">
                 <h3 class="chart-title">Focus Minutes (Last 7 Days)</h3>
                 <div class="chart-container" id="chartContainer">
@@ -310,6 +337,18 @@
 
     <!-- Confetti Container -->
     <div class="confetti-container" id="confettiContainer"></div>
+
+    <!-- Level Up Overlay -->
+    <div class="levelup-overlay" id="levelupOverlay">
+        <div class="levelup-content">
+            <div class="levelup-badge">
+                <div class="levelup-icon">⭐</div>
+                <div class="levelup-level" id="levelupNewLevel">2</div>
+            </div>
+            <h2 class="levelup-title">LEVEL UP!</h2>
+            <p class="levelup-subtitle">You've reached Level <span id="levelupLevelNum">2</span></p>
+        </div>
+    </div>
 
     <!-- Update Toast Notification -->
     <div class="update-toast" id="updateToast">

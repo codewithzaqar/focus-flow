@@ -1,8 +1,8 @@
 /* ============================================
-   FOCUSFLOW v0.0.5 - JavaScript
+   FOCUSFLOW v0.0.5.dev2 - JavaScript
    Multi-File Architecture Build (PWA Edition)
    Advanced PWA: Shortcuts, WCO, Wake Lock, Media Session, Haptics, Badging
-   Gamification: Flow Level System (XP, Levels, Progress, Achievements)
+   Gamification: Flow Level System (XP, Levels, Progress, Achievements, Streaks, Daily Goals)
    ============================================
    
    Modular Architecture:
@@ -26,7 +26,9 @@
    18. BadgeModule - Badging API (app icon badges)
    19. GamificationModule - XP, Levels, Flow Level system
    20. AchievementModule - Badge/Achievement system
-   21. App - Main initialization (with URL shortcut params)
+   21. StreakModule - Daily streak tracking
+   22. DailyGoalModule - Daily goal (4 sessions) with bonus XP
+   23. App - Main initialization (with URL shortcut params)
    
    ============================================ */
 
@@ -997,6 +999,16 @@ const UIModule = (() => {
         elements.achievementsModal = $('#achievementsModal');
         elements.achievementsClose = $('#achievementsClose');
         elements.achievementsGrid = $('#achievementsGrid');
+        // Streak elements
+        elements.streakIndicator = $('#streakIndicator');
+        elements.streakCount = $('#streakCount');
+        // Level Up elements
+        elements.levelupOverlay = $('#levelupOverlay');
+        elements.levelupNewLevel = $('#levelupNewLevel');
+        elements.levelupLevelNum = $('#levelupLevelNum');
+        // Daily Goal elements
+        elements.dailyGoalProgress = $('#dailyGoalProgress');
+        elements.dailyGoalCount = $('#dailyGoalCount');
     };
 
     const updateTimer = (state) => {
@@ -1217,6 +1229,75 @@ const UIModule = (() => {
         }
     };
 
+    // Show Level Up animation overlay
+    const showLevelUpAnimation = (newLevel) => {
+        if (!elements.levelupOverlay) return;
+        
+        // Update the level numbers
+        if (elements.levelupNewLevel) {
+            elements.levelupNewLevel.textContent = newLevel;
+        }
+        if (elements.levelupLevelNum) {
+            elements.levelupLevelNum.textContent = newLevel;
+        }
+        
+        // Show the overlay
+        elements.levelupOverlay.classList.add('visible');
+        
+        // Play success sound
+        AudioModule.playBeep();
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            elements.levelupOverlay.classList.add('fading');
+            setTimeout(() => {
+                elements.levelupOverlay.classList.remove('visible', 'fading');
+            }, 500);
+        }, 3000);
+    };
+
+    // Update streak display in header
+    const updateStreakDisplay = (streak) => {
+        if (elements.streakCount) {
+            elements.streakCount.textContent = streak;
+        }
+        // Hide streak indicator if streak is 0
+        if (elements.streakIndicator) {
+            elements.streakIndicator.style.display = streak > 0 ? 'flex' : 'none';
+        }
+    };
+
+    // Update daily goal widget display
+    const updateDailyGoalDisplay = (progress) => {
+        if (!elements.dailyGoalProgress || !elements.dailyGoalCount) return;
+        
+        // Update count
+        elements.dailyGoalCount.textContent = progress.sessionsToday;
+        
+        // Update progress ring
+        const circumference = 2 * Math.PI * 42; // r=42
+        const offset = circumference * (1 - progress.progress);
+        elements.dailyGoalProgress.style.strokeDashoffset = offset;
+        
+        // Add completed class if goal reached
+        const goalSection = document.querySelector('.daily-goal-section');
+        if (goalSection) {
+            if (progress.goalReached) {
+                goalSection.classList.add('completed');
+            } else {
+                goalSection.classList.remove('completed');
+            }
+            
+            // Add animation class if just reached
+            if (progress.goalJustReached) {
+                goalSection.classList.add('goal-reached');
+                setTimeout(() => {
+                    goalSection.classList.remove('goal-reached');
+                }, 600);
+            }
+        }
+    };
+
     // Toggle achievements modal
     const toggleAchievements = (show) => {
         if (elements.achievementsModal) {
@@ -1321,6 +1402,9 @@ const UIModule = (() => {
         updateXPDisplay,
         spawnXPFloat,
         triggerLevelUp,
+        showLevelUpAnimation,
+        updateStreakDisplay,
+        updateDailyGoalDisplay,
         notify,
         requestNotificationPermission
     };
@@ -1339,22 +1423,28 @@ const AppData = (() => {
         history: 'ff_history',
         settings: 'focusflow_settings_v2',
         theme: 'focusflow_theme',
+        timer_state: 'focusflow_timer_state',
         gamification: 'focusflow_gamification',
-        achievements: 'ff_achievements'
+        achievements: 'ff_achievements',
+        streak: 'focusflow_streak',
+        daily_goal: 'focusflow_daily_goal'
     };
 
     // Export all data to JSON
     const exportData = () => {
         try {
             const backup = {
-                version: 'v0.0.5',
+                version: 'v0.0.5.dev2',
                 exportedAt: new Date().toISOString(),
                 ff_tasks: StorageModule.get(BACKUP_KEYS.tasks, { tasks: [], activeTaskId: null }),
                 ff_history: StorageModule.get(BACKUP_KEYS.history, []),
                 ff_settings: StorageModule.get(BACKUP_KEYS.settings, SettingsModule.DEFAULT_SETTINGS),
                 ff_theme: StorageModule.get(BACKUP_KEYS.theme, 'default'),
+                ff_timer_state: StorageModule.get(BACKUP_KEYS.timer_state, null),
                 ff_gamification: StorageModule.get(BACKUP_KEYS.gamification, { totalXP: 0 }),
-                ff_achievements: StorageModule.get(BACKUP_KEYS.achievements, [])
+                ff_achievements: StorageModule.get(BACKUP_KEYS.achievements, []),
+                ff_streak: StorageModule.get(BACKUP_KEYS.streak, { streak: 0, lastFocusDate: null }),
+                ff_daily_goal: StorageModule.get(BACKUP_KEYS.daily_goal, { sessionsToday: 0, lastResetDate: null, goalReachedToday: false })
             };
 
             const jsonString = JSON.stringify(backup, null, 2);
@@ -1455,11 +1545,20 @@ const AppData = (() => {
                     if (data.ff_theme) {
                         StorageModule.set(BACKUP_KEYS.theme, data.ff_theme);
                     }
+                    if (data.ff_timer_state) {
+                        StorageModule.set(BACKUP_KEYS.timer_state, data.ff_timer_state);
+                    }
                     if (data.ff_gamification) {
                         StorageModule.set(BACKUP_KEYS.gamification, data.ff_gamification);
                     }
                     if (data.ff_achievements) {
                         StorageModule.set(BACKUP_KEYS.achievements, data.ff_achievements);
+                    }
+                    if (data.ff_streak) {
+                        StorageModule.set(BACKUP_KEYS.streak, data.ff_streak);
+                    }
+                    if (data.ff_daily_goal) {
+                        StorageModule.set(BACKUP_KEYS.daily_goal, data.ff_daily_goal);
                     }
 
                     resolve({ success: true, reloadRequired: true });
@@ -2298,9 +2397,225 @@ const AchievementModule = (() => {
 
 
 /* ============================================
-   MODULE 21: App
-   Main application initialization & events
-   ============================================ */
+    MODULE 21: StreakModule
+    Daily Streak System - Track consecutive days of focus sessions
+    Algorithm:
+    - If LastFocusDate == Yesterday: Increment Streak
+    - If LastFocusDate == Today: Maintain Streak
+    - If LastFocusDate < Yesterday: Reset Streak to 1
+    ============================================ */
+const StreakModule = (() => {
+    const STREAK_KEY = 'focusflow_streak';
+    
+    let state = {
+        streak: 0,
+        lastFocusDate: null
+    };
+
+    const init = () => {
+        const saved = StorageModule.get(STREAK_KEY, { streak: 0, lastFocusDate: null });
+        state.streak = saved.streak || 0;
+        state.lastFocusDate = saved.lastFocusDate || null;
+        
+        // Validate and fix streak on init
+        validateStreak();
+    };
+
+    const save = () => {
+        StorageModule.set(STREAK_KEY, state);
+    };
+
+    // Get today's date string (YYYY-MM-DD)
+    const getTodayString = () => {
+        return new Date().toISOString().split('T')[0];
+    };
+
+    // Get yesterday's date string
+    const getYesterdayString = () => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        return yesterday.toISOString().split('T')[0];
+    };
+
+    // Validate streak based on last focus date
+    const validateStreak = () => {
+        const today = getTodayString();
+        const yesterday = getYesterdayString();
+        
+        if (!state.lastFocusDate) {
+            // No sessions yet
+            state.streak = 0;
+        } else if (state.lastFocusDate === today) {
+            // Session completed today - streak is valid
+            // Streak stays as is
+        } else if (state.lastFocusDate === yesterday) {
+            // Last session was yesterday - streak is valid
+            // Streak stays as is
+        } else {
+            // Last session was before yesterday - streak broken
+            state.streak = 0;
+        }
+        
+        save();
+    };
+
+    // Record a focus session and update streak
+    const recordSession = () => {
+        const today = getTodayString();
+        const yesterday = getYesterdayString();
+        
+        if (state.lastFocusDate === today) {
+            // Already completed a session today - maintain streak
+            // Don't increment, just update last focus time
+        } else if (state.lastFocusDate === yesterday) {
+            // Completed yesterday - increment streak
+            state.streak += 1;
+        } else {
+            // Either first session or streak was broken - start at 1
+            state.streak = 1;
+        }
+        
+        state.lastFocusDate = today;
+        save();
+        
+        return {
+            streak: state.streak,
+            isNewDay: state.lastFocusDate !== today
+        };
+    };
+
+    const getStreak = () => state.streak;
+
+    const getLastFocusDate = () => state.lastFocusDate;
+
+    const reset = () => {
+        state = { streak: 0, lastFocusDate: null };
+        save();
+    };
+
+    return {
+        init,
+        recordSession,
+        getStreak,
+        getLastFocusDate,
+        validateStreak,
+        reset
+    };
+})();
+
+
+/* ============================================
+    MODULE 22: DailyGoalModule
+    Daily Goal Widget - Track 4 focus sessions per day
+    Awards 100 XP bonus when goal is reached
+    ============================================ */
+const DailyGoalModule = (() => {
+    const GOAL_KEY = 'focusflow_daily_goal';
+    const DAILY_GOAL_TARGET = 4;
+    const DAILY_GOAL_BONUS_XP = 100;
+
+    let state = {
+        sessionsToday: 0,
+        lastResetDate: null,
+        goalReachedToday: false
+    };
+
+    const init = () => {
+        const saved = StorageModule.get(GOAL_KEY, { 
+            sessionsToday: 0, 
+            lastResetDate: null,
+            goalReachedToday: false 
+        });
+        state.sessionsToday = saved.sessionsToday || 0;
+        state.lastResetDate = saved.lastResetDate || null;
+        state.goalReachedToday = saved.goalReachedToday || false;
+        
+        // Check if we need to reset for a new day
+        checkDailyReset();
+    };
+
+    const save = () => {
+        StorageModule.set(GOAL_KEY, state);
+    };
+
+    // Get today's date string
+    const getTodayString = () => {
+        return new Date().toISOString().split('T')[0];
+    };
+
+    // Check if we need to reset counter for new day
+    const checkDailyReset = () => {
+        const today = getTodayString();
+        
+        if (state.lastResetDate !== today) {
+            // New day - reset counter
+            state.sessionsToday = 0;
+            state.goalReachedToday = false;
+            state.lastResetDate = today;
+            save();
+        }
+    };
+
+    // Record a focus session
+    const recordSession = () => {
+        checkDailyReset();
+        
+        state.sessionsToday += 1;
+        
+        // Check if goal just reached
+        let goalJustReached = false;
+        if (state.sessionsToday === DAILY_GOAL_TARGET && !state.goalReachedToday) {
+            state.goalReachedToday = true;
+            goalJustReached = true;
+        }
+        
+        save();
+        
+        return {
+            sessionsToday: state.sessionsToday,
+            goalTarget: DAILY_GOAL_TARGET,
+            progress: Math.min(state.sessionsToday / DAILY_GOAL_TARGET, 1),
+            goalReached: state.goalReachedToday,
+            goalJustReached: goalJustReached,
+            bonusXP: goalJustReached ? DAILY_GOAL_BONUS_XP : 0
+        };
+    };
+
+    const getProgress = () => {
+        checkDailyReset();
+        return {
+            sessionsToday: state.sessionsToday,
+            goalTarget: DAILY_GOAL_TARGET,
+            progress: Math.min(state.sessionsToday / DAILY_GOAL_TARGET, 1),
+            goalReached: state.goalReachedToday
+        };
+    };
+
+    const reset = () => {
+        state = {
+            sessionsToday: 0,
+            lastResetDate: null,
+            goalReachedToday: false
+        };
+        save();
+    };
+
+    return {
+        init,
+        recordSession,
+        getProgress,
+        checkDailyReset,
+        reset,
+        DAILY_GOAL_TARGET,
+        DAILY_GOAL_BONUS_XP
+    };
+})();
+
+
+/* ============================================
+    MODULE 23: App
+    Main application initialization & events
+    ============================================ */
 const App = (() => {
     let currentMode = 'focus';
     const MODES = ['focus', 'short', 'long'];
@@ -2311,6 +2626,8 @@ const App = (() => {
         ChartModule.init('focusChart');
         GamificationModule.init();
         AchievementModule.init();
+        StreakModule.init();
+        DailyGoalModule.init();
         
         // Initialize theme
         const currentTheme = ThemeModule.init();
@@ -2336,6 +2653,12 @@ const App = (() => {
 
         // Initialize XP display
         UIModule.updateXPDisplay();
+        
+        // Initialize streak display
+        UIModule.updateStreakDisplay(StreakModule.getStreak());
+        
+        // Initialize daily goal display
+        UIModule.updateDailyGoalDisplay(DailyGoalModule.getProgress());
 
         // Initialize volume display
         const initialVolume = AudioModule.getVolume() * 100;
@@ -2403,8 +2726,29 @@ const App = (() => {
                 const xpResult = GamificationModule.awardFocusXP(duration);
                 UIModule.updateXPDisplay();
                 if (xpResult?.leveledUp) {
+                    UIModule.showLevelUpAnimation(xpResult.newLevel);
                     UIModule.triggerLevelUp();
                     AchievementModule.checkSpecific('MARATHONER');
+                }
+                
+                // Update streak
+                const streakResult = StreakModule.recordSession();
+                UIModule.updateStreakDisplay(streakResult.streak);
+                
+                // Update daily goal
+                const goalResult = DailyGoalModule.recordSession();
+                UIModule.updateDailyGoalDisplay(goalResult);
+                
+                // Award bonus XP if daily goal reached
+                if (goalResult.goalJustReached) {
+                    const bonusResult = GamificationModule.awardXP(goalResult.bonusXP);
+                    UIModule.spawnXPFloat(goalResult.bonusXP, UIModule.elements.dailyGoalProgress);
+                    UIModule.updateXPDisplay();
+                    if (bonusResult.leveledUp) {
+                        UIModule.showLevelUpAnimation(bonusResult.newLevel);
+                        UIModule.triggerLevelUp();
+                    }
+                    AudioModule.playBeep(); // Play success sound for goal
                 }
                 
                 // Check session-based achievements
@@ -2515,10 +2859,31 @@ const App = (() => {
                 UIModule.spawnXPFloat(xpResult.awarded, UIModule.elements.timer);
                 UIModule.updateXPDisplay();
                 if (xpResult.leveledUp) {
+                    UIModule.showLevelUpAnimation(xpResult.newLevel);
                     UIModule.triggerLevelUp();
                     // Check Marathoner achievement on level up
                     AchievementModule.checkSpecific('MARATHONER');
                 }
+            }
+            
+            // Update streak
+            const streakResult = StreakModule.recordSession();
+            UIModule.updateStreakDisplay(streakResult.streak);
+            
+            // Update daily goal
+            const goalResult = DailyGoalModule.recordSession();
+            UIModule.updateDailyGoalDisplay(goalResult);
+            
+            // Award bonus XP if daily goal reached
+            if (goalResult.goalJustReached) {
+                const bonusResult = GamificationModule.awardXP(goalResult.bonusXP);
+                UIModule.spawnXPFloat(goalResult.bonusXP, UIModule.elements.dailyGoalProgress);
+                UIModule.updateXPDisplay();
+                if (bonusResult.leveledUp) {
+                    UIModule.showLevelUpAnimation(bonusResult.newLevel);
+                    UIModule.triggerLevelUp();
+                }
+                AudioModule.playBeep(); // Play success sound for goal
             }
             
             // Check session-based achievements
@@ -2634,7 +2999,7 @@ const App = (() => {
             } else if (action === 'complete') {
                 const task = TaskModule.toggleComplete(taskId);
                 // Trigger haptic feedback when completing a task
-                if (task && task.completed) {
+                    if (task && task.completed) {
                     HapticsModule.taskComplete();
                     // Award XP for task completion
                     const xpResult = GamificationModule.awardTaskXP();
@@ -2642,6 +3007,7 @@ const App = (() => {
                         UIModule.spawnXPFloat(xpResult.awarded, taskItem);
                         UIModule.updateXPDisplay();
                         if (xpResult.leveledUp) {
+                            UIModule.showLevelUpAnimation(xpResult.newLevel);
                             UIModule.triggerLevelUp();
                             AchievementModule.checkSpecific('MARATHONER');
                         }
@@ -2759,8 +3125,12 @@ const App = (() => {
                 HistoryModule.clearHistory();
                 GamificationModule.reset();
                 AchievementModule.reset();
+                StreakModule.reset();
+                DailyGoalModule.reset();
                 UIModule.updateStatsDisplay();
                 UIModule.updateXPDisplay();
+                UIModule.updateStreakDisplay(0);
+                UIModule.updateDailyGoalDisplay({ sessionsToday: 0, goalTarget: 4, progress: 0, goalReached: false });
                 UIModule.toggleSettings(false);
                 // Update badge after clearing history
                 BadgeModule.updateFromState();
